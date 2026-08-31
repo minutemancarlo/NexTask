@@ -268,6 +268,57 @@ export const TaskProvider = ({ children }) => {
     playDingDongSound();
   };
 
+  // Simulate a Sample New Ticket arrival (triggers Ding-Dong sound, toast alert, and notification)
+  const simulateSampleNewTicket = () => {
+    const sampleId = Math.floor(50500 + Math.random() * 500);
+    const sampleProjects = ['Axis Core Banking', 'SMADs Financial Services', 'Treasury & Risk Management', 'Digital Mobile Banking'];
+    const sampleSeverities = ['Critical', 'Major', 'Normal'];
+    const sampleSubjects = [
+      'Customer Transaction Timeout on Peak Hour Settlement',
+      'Real-Time Balance Verification Intermittent 504 Gateway',
+      'Account Ledger Sync Mismatch during EOD Clearing Batch',
+      'High Priority Audit Trail Logging Failure in Transfer Service',
+      'OAuth2 Token Expiration on Multi-Factor Authentication',
+    ];
+
+    const randomSubject = sampleSubjects[Math.floor(Math.random() * sampleSubjects.length)];
+    const randomProject = sampleProjects[Math.floor(Math.random() * sampleProjects.length)];
+    const randomSeverity = sampleSeverities[Math.floor(Math.random() * sampleSeverities.length)];
+
+    const sampleTicket = {
+      opId: sampleId,
+      subject: randomSubject,
+      formattedTitle: `#${sampleId} - ${randomSubject}`,
+      dueDate: new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0],
+      qaContact: 'Elena Rostova (Lead QA)',
+      severity: randomSeverity,
+      priorityTitle: randomSeverity === 'Critical' ? 'Immediate' : 'High',
+      projectName: randomProject,
+      ticketUrl: `${settings.openproject?.host || 'https://app.teligent.ph/openproject'}/work_packages/${sampleId}`,
+      opStatusTitle: 'New',
+      suggestedQuadrant: randomSeverity === 'Critical' ? 'Q1' : 'Q2',
+      suggestedCategoryId: 'work',
+      suggestedStatus: 'todo',
+      createdAt: new Date().toISOString(),
+    };
+
+    // Play Ding-Dong chime sound
+    playDingDongSound();
+
+    // Trigger desktop notification
+    showTicketNotification(sampleTicket, () => {
+      setActiveView('matrix');
+      openSyncReview({ projectId: sampleTicket.projectName });
+    });
+
+    // Display In-App Floating Toast
+    setActiveNewTicketAlert({
+      count: 1,
+      latestTicket: sampleTicket,
+      tickets: [sampleTicket],
+    });
+  };
+
   // Periodic Monitor for OpenProject New Tickets
   useEffect(() => {
     const opConfig = settings.openproject;
@@ -432,6 +483,7 @@ export const TaskProvider = ({ children }) => {
         quickSyncNewTicket,
         dismissNewTicketAlert,
         testDingDongChime,
+        simulateSampleNewTicket,
         isMonitoringActive,
         lastMonitoredAt,
       }}
