@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Browser Desktop Notifications Utility for NexTask
  */
 
@@ -22,15 +22,18 @@ export function showTicketNotification(ticket, onClickAction) {
     return null;
   }
 
-  const title = `🔔 New OpenProject Ticket #${ticket.opId}`;
-  const body = `${ticket.subject}\nProject: ${ticket.projectName || 'Default'} | Priority: ${ticket.priorityTitle || 'Normal'}`;
+  const title = `NexTask • New Ticket #${ticket.opId}`;
+  const body = `${ticket.subject}\nProject: ${ticket.projectName || 'General'} | QA: ${ticket.qaContact || 'N/A'}`;
+
+  // Get absolute URL for app logo icon so OS notification manager loads it properly
+  const iconUrl = new URL('/favicon.svg', window.location.origin).href;
 
   try {
     const notification = new Notification(title, {
       body,
-      icon: '/favicon.svg',
-      badge: '/favicon.svg',
-      tag: `op-ticket-${ticket.opId}`,
+      icon: iconUrl,
+      badge: iconUrl,
+      tag: `nextask-ticket-${ticket.opId}`,
       renotify: true,
       requireInteraction: false,
     });
