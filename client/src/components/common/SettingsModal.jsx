@@ -16,10 +16,14 @@ import {
   Eye,
   EyeOff,
   ExternalLink,
-  FolderGit2
+  FolderGit2,
+  Volume2,
+  BellRing,
+  Radio,
 } from 'lucide-react';
 import { useTasks } from '../../context/TaskContext';
 import { api } from '../../services/api';
+import { requestNotificationPermission } from '../../utils/notification';
 import { StatusFilterSelect } from './StatusFilterSelect';
 import { ProjectMultiSelect } from './ProjectMultiSelect';
 
@@ -35,6 +39,7 @@ export const SettingsModal = () => {
     openSyncReview,
     purgeAllTasks,
     refreshData,
+    testDingDongChime,
   } = useTasks();
 
   const [newCatName, setNewCatName] = useState('');
@@ -48,6 +53,26 @@ export const SettingsModal = () => {
   const [opMock, setOpMock] = useState(settings.openproject?.mock || false);
   const [opDefaultQuadrant, setOpDefaultQuadrant] = useState(settings.openproject?.defaultQuadrant || '');
   const [showApiKey, setShowApiKey] = useState(false);
+
+  // Real-Time / Periodic Monitoring Settings
+  const [opMonitorEnabled, setOpMonitorEnabled] = useState(
+    settings.openproject?.monitorEnabled !== false
+  );
+  const [opMonitorInterval, setOpMonitorInterval] = useState(
+    settings.openproject?.monitorInterval || 60
+  );
+  const [opMonitorSound, setOpMonitorSound] = useState(
+    settings.openproject?.monitorSound !== false
+  );
+  const [opMonitorBrowserNotification, setOpMonitorBrowserNotification] = useState(
+    settings.openproject?.monitorBrowserNotification !== false
+  );
+  const [opMonitorAutoSync, setOpMonitorAutoSync] = useState(
+    settings.openproject?.monitorAutoSync || false
+  );
+  const [notificationPermissionState, setNotificationPermissionState] = useState(
+    typeof window !== 'undefined' && 'Notification' in window ? Notification.permission : 'default'
+  );
 
   // OpenProject Interactive State
   const [testLoading, setTestLoading] = useState(false);
@@ -111,6 +136,11 @@ export const SettingsModal = () => {
           ? settings.openproject.allowedProjectIds.map(String)
           : []
       );
+      setOpMonitorEnabled(settings.openproject.monitorEnabled !== false);
+      setOpMonitorInterval(settings.openproject.monitorInterval || 60);
+      setOpMonitorSound(settings.openproject.monitorSound !== false);
+      setOpMonitorBrowserNotification(settings.openproject.monitorBrowserNotification !== false);
+      setOpMonitorAutoSync(settings.openproject.monitorAutoSync || false);
     }
   }, [settings.openproject]);
 
@@ -142,6 +172,11 @@ export const SettingsModal = () => {
         statusId: selectedOpStatusIds.length > 0 ? selectedOpStatusIds : 'all',
         statusOperator: selectedOpStatusOperator,
         defaultQuadrant: opDefaultQuadrant,
+        monitorEnabled: opMonitorEnabled,
+        monitorInterval: parseInt(opMonitorInterval, 10) || 60,
+        monitorSound: opMonitorSound,
+        monitorBrowserNotification: opMonitorBrowserNotification,
+        monitorAutoSync: opMonitorAutoSync,
       }
     };
     await updateSettings(updated);
@@ -669,6 +704,139 @@ export const SettingsModal = () => {
                   <span>{syncResult.message}</span>
                 </div>
               )}
+
+              {/* Real-Time / Periodic Monitoring Panel */}
+              <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700/80">
+                <div className="flex items-center justify-between gap-3 mb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-indigo-100 dark:bg-indigo-950/70 border border-indigo-200 dark:border-indigo-800 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
+                      <Radio className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h5 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                        Real-Time / Periodic Ticket Monitoring
+                        <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/40">
+                          Status = New
+                        </span>
+                      </h5>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
+                        Automatically scans for newly submitted tickets and alerts you with sound & desktop alerts.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Enable Switch */}
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={opMonitorEnabled}
+                      onChange={(e) => setOpMonitorEnabled(e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-600 peer-checked:bg-indigo-600"></div>
+                  </label>
+                </div>
+
+                {opMonitorEnabled && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-2 pl-10">
+                    {/* Polling Interval */}
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                        Polling Frequency
+                      </label>
+                      <select
+                        value={opMonitorInterval}
+                        onChange={(e) => setOpMonitorInterval(Number(e.target.value))}
+                        className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-indigo-500/20"
+                      >
+                        <option value={30}>Every 30 Seconds (Fast)</option>
+                        <option value={60}>Every 1 Minute (Recommended)</option>
+                        <option value={120}>Every 2 Minutes</option>
+                        <option value={300}>Every 5 Minutes (Low traffic)</option>
+                      </select>
+                    </div>
+
+                    {/* Sound Settings & Chime Tester */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                          <Volume2 className="w-3.5 h-3.5 text-indigo-500" />
+                          Ding-Dong Chime
+                        </label>
+                        <button
+                          type="button"
+                          onClick={testDingDongChime}
+                          className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 cursor-pointer"
+                        >
+                          🔔 Play Sound Test
+                        </button>
+                      </div>
+                      <label className="flex items-center gap-2.5 p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={opMonitorSound}
+                          onChange={(e) => setOpMonitorSound(e.target.checked)}
+                          className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500"
+                        />
+                        <span className="text-xs text-slate-700 dark:text-slate-300 font-medium">
+                          Play harmonic chime on new ticket
+                        </span>
+                      </label>
+                    </div>
+
+                    {/* Browser Notifications */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                          <BellRing className="w-3.5 h-3.5 text-indigo-500" />
+                          Desktop Notifications
+                        </label>
+                        {notificationPermissionState !== 'granted' && (
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              const perm = await requestNotificationPermission();
+                              setNotificationPermissionState(perm);
+                            }}
+                            className="text-[11px] font-bold text-amber-600 dark:text-amber-400 hover:underline cursor-pointer"
+                          >
+                            Grant Permission
+                          </button>
+                        )}
+                      </div>
+                      <label className="flex items-center gap-2.5 p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={opMonitorBrowserNotification}
+                          onChange={(e) => setOpMonitorBrowserNotification(e.target.checked)}
+                          className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500"
+                        />
+                        <span className="text-xs text-slate-700 dark:text-slate-300 font-medium">
+                          Show native desktop popups
+                        </span>
+                      </label>
+                    </div>
+
+                    {/* Auto Sync Toggle */}
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                        Automatic Matrix Sync
+                      </label>
+                      <label className="flex items-center gap-2.5 p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={opMonitorAutoSync}
+                          onChange={(e) => setOpMonitorAutoSync(e.target.checked)}
+                          className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500"
+                        />
+                        <span className="text-xs text-slate-700 dark:text-slate-300 font-medium">
+                          Auto-add to Matrix without prompt
+                        </span>
+                      </label>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 

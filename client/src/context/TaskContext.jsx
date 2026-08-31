@@ -1,5 +1,7 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '../services/api';
+import { playDingDongSound } from '../utils/sound';
+import { showTicketNotification } from '../utils/notification';
 
 const TaskContext = createContext();
 
@@ -16,6 +18,19 @@ export const TaskProvider = ({ children }) => {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Real-Time / Periodic New Ticket Monitoring State
+  const [activeNewTicketAlert, setActiveNewTicketAlert] = useState(null);
+  const [isMonitoringActive, setIsMonitoringActive] = useState(false);
+  const [lastMonitoredAt, setLastMonitoredAt] = useState(null);
+  const [notifiedTicketIds, setNotifiedTicketIds] = useState(() => {
+    try {
+      const saved = localStorage.getItem('nextask_notified_tickets');
+      return saved ? new Set(JSON.parse(saved)) : new Set();
+    } catch (e) {
+      return new Set();
+    }
+  });
 
   // Filters & Views
   const [activeView, setActiveView] = useState('matrix'); // 'matrix' | 'kanban' | 'list' | 'openproject'
@@ -228,6 +243,126 @@ export const TaskProvider = ({ children }) => {
     return openSyncReview(options);
   };
 
+  // Quick sync single new ticket from live toast alert
+  const quickSyncNewTicket = async (ticket, targetQuadrant) => {
+    const quadrant = targetQuadrant || ticket.suggestedQuadrant || 'Q1';
+    const approvedTicket = {
+      ...ticket,
+      suggestedQuadrant: quadrant,
+      suggestedStatus: 'todo',
+      selectedForSync: true,
+    };
+    try {
+      await commitSyncReview([approvedTicket]);
+      setActiveNewTicketAlert(null);
+    } catch (e) {
+      console.error('Failed to quick sync new ticket:', e);
+    }
+  };
+
+  const dismissNewTicketAlert = () => {
+    setActiveNewTicketAlert(null);
+  };
+
+  const testDingDongChime = () => {
+    playDingDongSound();
+  };
+
+  // Periodic Monitor for OpenProject New Tickets
+  useEffect(() => {
+    const opConfig = settings.openproject;
+    const isConfigured = !!(opConfig?.mock || (opConfig?.host && opConfig?.apiKey));
+    const isMonitorEnabled = opConfig?.monitorEnabled !== false; // Default true if configured
+
+    if (!isConfigured || !isMonitorEnabled) {
+      setIsMonitoringActive(false);
+      return;
+    }
+
+    setIsMonitoringActive(true);
+    const intervalSeconds = Math.max(15, parseInt(opConfig?.monitorInterval, 10) || 60);
+
+    const checkNewTickets = async () => {
+      try {
+        const res = await api.pollNewOpenProjectTickets({
+          host: opConfig.host,
+          apiKey: opConfig.apiKey,
+          mock: opConfig.mock,
+          projectId: opConfig.projectId,
+          assigneeId: opConfig.assigneeId || 'me',
+        });
+
+        setLastMonitoredAt(new Date().toISOString());
+
+        if (res.success && Array.isArray(res.newTickets) && res.newTickets.length > 0) {
+          // Find newly arrived tickets that haven't been notified yet in this browser session
+          const unnotifiedTickets = res.newTickets.filter(
+            ticket => !notifiedTicketIds.has(ticket.opId)
+          );
+
+          if (unnotifiedTickets.length > 0) {
+            // Play Ding-Dong sound chime if sound enabled
+            if (opConfig.monitorSound !== false) {
+              playDingDongSound();
+            }
+
+            // Trigger Browser Desktop Notification if enabled
+            if (opConfig.monitorBrowserNotification !== false) {
+              unnotifiedTickets.forEach(ticket => {
+                showTicketNotification(ticket, () => {
+                  setActiveView('matrix');
+                  openSyncReview({ projectId: ticket.projectName });
+                });
+              });
+            }
+
+            // Trigger In-App Floating Toast Alert
+            setActiveNewTicketAlert({
+              count: unnotifiedTickets.length,
+              latestTicket: unnotifiedTickets[0],
+              tickets: unnotifiedTickets,
+            });
+
+            // If auto-sync is enabled in settings, auto-commit them directly
+            if (opConfig.monitorAutoSync === true) {
+              await commitSyncReview(unnotifiedTickets);
+            }
+
+            // Update notifiedTicketIds so we do not chime again for these tickets
+            setNotifiedTicketIds(prev => {
+              const updated = new Set(prev);
+              unnotifiedTickets.forEach(t => updated.add(t.opId));
+              try {
+                localStorage.setItem('nextask_notified_tickets', JSON.stringify(Array.from(updated)));
+              } catch (e) {}
+              return updated;
+            });
+          }
+        }
+      } catch (pollErr) {
+        console.warn('[NexTask Monitor] Background poll error:', pollErr.message);
+      }
+    };
+
+    // Run initial check on startup / mount
+    checkNewTickets();
+
+    const intervalId = setInterval(checkNewTickets, intervalSeconds * 1000);
+    return () => clearInterval(intervalId);
+  }, [
+    settings.openproject?.host,
+    settings.openproject?.apiKey,
+    settings.openproject?.mock,
+    settings.openproject?.projectId,
+    settings.openproject?.assigneeId,
+    settings.openproject?.monitorEnabled,
+    settings.openproject?.monitorInterval,
+    settings.openproject?.monitorSound,
+    settings.openproject?.monitorBrowserNotification,
+    settings.openproject?.monitorAutoSync,
+    notifiedTicketIds,
+  ]);
+
   // Filtered Tasks helper (No subtasks)
   const filteredTasks = tasks.filter(task => {
     if (selectedQuadrantFilter && task.quadrant !== selectedQuadrantFilter) {
@@ -292,6 +427,13 @@ export const TaskProvider = ({ children }) => {
         commitSyncReview,
         purgeAllTasks,
         refreshData: fetchData,
+        // Live Monitoring & Sound
+        activeNewTicketAlert,
+        quickSyncNewTicket,
+        dismissNewTicketAlert,
+        testDingDongChime,
+        isMonitoringActive,
+        lastMonitoredAt,
       }}
     >
       {children}

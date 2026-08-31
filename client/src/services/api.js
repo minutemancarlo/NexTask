@@ -175,6 +175,20 @@ export const api = {
     return data;
   },
 
+  async pollNewOpenProjectTickets(params = {}) {
+    const query = new URLSearchParams();
+    if (params.host) query.append('host', params.host);
+    if (params.apiKey) query.append('apiKey', params.apiKey);
+    if (params.mock !== undefined) query.append('mock', params.mock);
+    if (params.projectId) query.append('projectId', params.projectId);
+    if (params.assigneeId) query.append('assigneeId', params.assigneeId);
+
+    const res = await fetch(`${API_BASE}/openproject/poll-new?${query.toString()}`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to poll new OpenProject tickets');
+    return data;
+  },
+
   async syncOpenProjectTickets(options = {}) {
     const res = await fetch(`${API_BASE}/openproject/sync`, {
       method: 'POST',

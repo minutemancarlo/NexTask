@@ -721,6 +721,85 @@ router.post('/fetch-candidates', async (req, res) => {
   }
 });
 
+// GET /api/openproject/poll-new
+// Lightweight periodic check for tickets with status = 'New' that haven't been synced to SQLite yet.
+router.get('/poll-new', async (req, res) => {
+  try {
+    const config = getOpenProjectConfig();
+    const host = req.query.host || config?.host;
+    const apiKey = req.query.apiKey || config?.apiKey;
+    const mock = req.query.mock === 'true' || config?.mock === true;
+
+    if (!mock && (!host || !apiKey)) {
+      return res.json({ success: true, active: false, newTickets: [] });
+    }
+
+    const projectId = req.query.projectId || config?.projectId;
+    const allowedProjectIds = config?.allowedProjectIds || [];
+    const assigneeId = req.query.assigneeId || config?.assigneeId || 'me';
+
+    // Status is strictly 'New' (ID 1 in standard OpenProject schemas)
+    const workPackages = await fetchRawWorkPackages({
+      host,
+      apiKey,
+      projectId,
+      allowedProjectIds,
+      assigneeId,
+      statusId: ['1'], // Filter specifically for New
+      statusOperator: '=',
+      mock
+    });
+
+    const cleanHost = normalizeHost(host || 'https://openproject.local');
+
+    // Get all existing openproject_ids already synced to SQLite
+    const existingRows = db.prepare('SELECT openproject_id FROM tasks WHERE openproject_id IS NOT NULL').all();
+    const existingIdSet = new Set(existingRows.map(r => Number(r.openproject_id)));
+
+    const unsyncedNewTickets = [];
+    for (const wp of workPackages) {
+      const opId = Number(wp.id);
+      const statusTitle = wp._links?.status?.title || 'New';
+      const isNewStatus = statusTitle.toLowerCase().includes('new') || String(wp._links?.status?.id) === '1';
+
+      if (isNewStatus && !existingIdSet.has(opId)) {
+        const severity = extractSeverity(wp);
+        const priorityTitle = wp._links?.priority?.title || '';
+        const suggestedQuadrant = config?.defaultQuadrant || mapSeverityToQuadrant(severity, priorityTitle);
+        const matchedCategoryId = matchOrCreateClaritiCategory(wp._links?.project);
+
+        unsyncedNewTickets.push({
+          opId,
+          subject: wp.subject || 'New Work Package',
+          formattedTitle: `#${opId} - ${wp.subject || 'Work Package'}`,
+          dueDate: wp.dueDate || null,
+          qaContact: extractQAContact(wp),
+          severity,
+          priorityTitle,
+          projectName: wp._links?.project?.title || '',
+          ticketUrl: `${cleanHost}/work_packages/${opId}`,
+          opStatusTitle: statusTitle,
+          suggestedQuadrant,
+          suggestedCategoryId,
+          suggestedStatus: 'todo',
+          createdAt: wp.createdAt || new Date().toISOString()
+        });
+      }
+    }
+
+    res.json({
+      success: true,
+      active: true,
+      count: unsyncedNewTickets.length,
+      newTickets: unsyncedNewTickets,
+      checkedAt: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Error polling new tickets from OpenProject:', error);
+    res.status(500).json({ error: `Polling failed: ${error.message}` });
+  }
+});
+
 // POST /api/openproject/sync
 // Commits confirmed and reviewed tickets to SQLite
 router.post('/sync', async (req, res) => {
