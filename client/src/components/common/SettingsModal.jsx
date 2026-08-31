@@ -148,9 +148,12 @@ export const SettingsModal = () => {
     }
   }, [settings.openproject]);
 
-  // Auto-fetch OpenProject projects and users if credentials are saved and modal opens
+  // Auto-trigger Test Connection, fetch projects and statuses when modal opens with credentials
   useEffect(() => {
     if (isSettingsOpen && (opHost || settings.openproject?.host) && (opApiKey || settings.openproject?.apiKey)) {
+      if (!testResult && !testLoading) {
+        handleTestConnection();
+      }
       if (opProjects.length === 0 && !projectsLoading) {
         handleFetchProjects();
       }
@@ -158,7 +161,7 @@ export const SettingsModal = () => {
         handleFetchStatuses();
       }
     }
-  }, [isSettingsOpen, opHost, opApiKey, opProjects.length, opStatuses.length]);
+  }, [isSettingsOpen, opHost, opApiKey]);
 
   if (!isSettingsOpen) return null;
 

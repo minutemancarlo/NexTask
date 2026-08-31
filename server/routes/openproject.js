@@ -768,7 +768,7 @@ router.get('/poll-new', async (req, res) => {
         const severity = extractSeverity(wp);
         const priorityTitle = wp._links?.priority?.title || '';
         const suggestedQuadrant = config?.defaultQuadrant || mapSeverityToQuadrant(severity, priorityTitle);
-        const matchedCategoryId = matchOrCreateClaritiCategory(wp._links?.project);
+        const suggestedCategoryId = matchOrCreateClaritiCategory(wp._links?.project);
 
         unsyncedNewTickets.push({
           opId,
