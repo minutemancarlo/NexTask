@@ -760,7 +760,9 @@ router.get('/poll-new', async (req, res) => {
     for (const wp of workPackages) {
       const opId = Number(wp.id);
       const statusTitle = wp._links?.status?.title || 'New';
-      const isNewStatus = statusTitle.toLowerCase().includes('new') || String(wp._links?.status?.id) === '1';
+      const statusHref = wp._links?.status?.href || '';
+      const statusIdFromHref = statusHref.split('/').pop() || '';
+      const isNewStatus = statusTitle.toLowerCase().includes('new') || statusIdFromHref === '1' || String(wp._links?.status?.id || '') === '1';
 
       if (isNewStatus && !existingIdSet.has(opId)) {
         const severity = extractSeverity(wp);

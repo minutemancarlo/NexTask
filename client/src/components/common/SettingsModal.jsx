@@ -43,6 +43,7 @@ export const SettingsModal = () => {
     testDingDongChime,
     simulateSampleNewTicket,
     confirmAction,
+    resetMonitoringHistory,
   } = useTasks();
 
   const [newCatName, setNewCatName] = useState('');
@@ -766,14 +767,25 @@ export const SettingsModal = () => {
                           <Volume2 className="w-3.5 h-3.5 text-indigo-500" />
                           Ding-Dong Chime
                         </label>
-                        <button
-                          type="button"
-                          onClick={testDingDongChime}
-                          className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 cursor-pointer"
-                          title="Test the Web Audio doorbell chime"
-                        >
-                          🔔 Play Sound Test
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={testDingDongChime}
+                            className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 cursor-pointer"
+                            title="Test the Web Audio doorbell chime"
+                          >
+                            🔔 Play Sound Test
+                          </button>
+                          <span className="text-slate-300 dark:text-slate-600">|</span>
+                          <button
+                            type="button"
+                            onClick={resetMonitoringHistory}
+                            className="text-[11px] font-bold text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-1 cursor-pointer"
+                            title="Reset notification memory so unsynced tickets are captured again"
+                          >
+                            🔄 Reset Monitor Memory
+                          </button>
+                        </div>
                       </div>
                       <label className="flex items-center gap-2.5 p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 cursor-pointer">
                         <input

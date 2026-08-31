@@ -247,10 +247,21 @@ export const TaskProvider = ({ children }) => {
     }
   };
 
+  // Reset monitoring notification memory
+  const resetMonitoringHistory = () => {
+    setNotifiedTicketIds(new Set());
+    setActiveNewTicketAlerts([]);
+    try {
+      localStorage.removeItem('nextask_notified_tickets');
+    } catch (e) {}
+  };
+
   // Danger Zone Purge
   const purgeAllTasks = async () => {
     try {
       const res = await api.purgeNexTaskData();
+      // Reset live monitor notification memory on purge so unsynced tickets are captured afresh
+      resetMonitoringHistory();
       await fetchData();
       return res;
     } catch (err) {
@@ -391,9 +402,11 @@ export const TaskProvider = ({ children }) => {
         setLastMonitoredAt(new Date().toISOString());
 
         if (res.success && Array.isArray(res.newTickets) && res.newTickets.length > 0) {
-          // Find newly arrived tickets that haven't been notified yet in this browser session
+          // Find newly arrived tickets that are unsynced in tasks AND haven't been notified yet
+          const syncedOpIds = new Set(tasks.filter(t => t.openproject_id).map(t => Number(t.openproject_id)));
+
           const unnotifiedTickets = res.newTickets.filter(
-            ticket => !notifiedTicketIds.has(ticket.opId)
+            ticket => !syncedOpIds.has(Number(ticket.opId)) && !notifiedTicketIds.has(Number(ticket.opId))
           );
 
           if (unnotifiedTickets.length > 0) {
@@ -535,6 +548,7 @@ export const TaskProvider = ({ children }) => {
         dismissNewTicketAlert,
         testDingDongChime,
         simulateSampleNewTicket,
+        resetMonitoringHistory,
         isMonitoringActive,
         lastMonitoredAt,
       }}
