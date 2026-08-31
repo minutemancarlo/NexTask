@@ -15,14 +15,29 @@ NexTask is an Eisenhower Matrix productivity application built for fast, high-im
 
 ## Getting Started
 
-### Installation
+### Installation & Quick Start
 1. Install dependencies:
-   npm install (in root, client, and server)
+   ```bash
+   npm install
+   cd client && npm install
+   cd ../server && npm install
+   cd ..
+   ```
 
-2. Start both the backend and frontend dev servers:
-   npm run dev
+2. Run with the batch controller (`nextask.bat`):
+   - Double-click `nextask.bat` to launch the interactive controller menu.
+   - Or run from command prompt / terminal:
+     ```cmd
+     nextask.bat start     :: Starts backend & frontend silently in background
+     nextask.bat stop      :: Stops all running services cleanly
+     nextask.bat status    :: Checks live status of ports 3001 & 5173
+     nextask.bat restart   :: Restarts both services
+     nextask.bat open      :: Opens http://localhost:5173 in default browser
+     ```
 
-3. Open http://localhost:5173
+3. Browser access:
+   - Frontend UI: `http://localhost:5173`
+   - Backend API: `http://localhost:3001`
 
 ## License
 MIT
