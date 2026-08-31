@@ -157,17 +157,6 @@ export const Header = () => {
             </button>
           )}
 
-          {/* Quick Button for Sample New Ticket (Simulate Chime + Toast) */}
-          <button
-            onClick={simulateSampleNewTicket}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800/50 text-amber-700 dark:text-amber-300 text-xs font-bold hover:bg-amber-100 dark:hover:bg-amber-900/60 active:scale-95 transition-all cursor-pointer shadow-2xs"
-            title="Simulate receiving a new ticket (triggers Ding-Dong chime, desktop alert, and in-app toast)"
-          >
-            <Sparkles className="w-3.5 h-3.5 text-amber-500 animate-spin-slow" />
-            <span className="hidden md:inline">Sample New Ticket</span>
-            <span className="md:hidden">Sample</span>
-          </button>
-
           {/* Theme Toggle */}
           <button
             onClick={toggleTheme}

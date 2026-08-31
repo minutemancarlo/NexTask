@@ -350,7 +350,7 @@ export const SettingsModal = () => {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
       <div
-        className="w-full max-w-xl bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden flex flex-col max-h-[88vh]"
+        className="w-full max-w-4xl bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden flex flex-col max-h-[88vh]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -766,26 +766,14 @@ export const SettingsModal = () => {
                           <Volume2 className="w-3.5 h-3.5 text-indigo-500" />
                           Ding-Dong Chime
                         </label>
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={testDingDongChime}
-                            className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 cursor-pointer"
-                            title="Test the Web Audio doorbell chime"
-                          >
-                            🔔 Play Chime
-                          </button>
-                          <span className="text-slate-300 dark:text-slate-600">|</span>
-                          <button
-                            type="button"
-                            onClick={simulateSampleNewTicket}
-                            className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 cursor-pointer"
-                            title="Simulate receiving an actual new ticket (sound + toast + desktop popup)"
-                          >
-                            <Sparkles className="w-3 h-3 text-amber-500" />
-                            Sample New Ticket
-                          </button>
-                        </div>
+                        <button
+                          type="button"
+                          onClick={testDingDongChime}
+                          className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 cursor-pointer"
+                          title="Test the Web Audio doorbell chime"
+                        >
+                          🔔 Play Sound Test
+                        </button>
                       </div>
                       <label className="flex items-center gap-2.5 p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 cursor-pointer">
                         <input
