@@ -42,6 +42,7 @@ export const TaskModal = () => {
     updateTask,
     deleteTask,
     categories,
+    confirmAction,
   } = useTasks();
 
   const isNew = editingTask === 'new';
@@ -276,10 +277,16 @@ export const TaskModal = () => {
             <button
               type="button"
               onClick={() => {
-                if (window.confirm('Are you sure you want to delete this task?')) {
-                  deleteTask(editingTask.id);
-                  setEditingTask(null);
-                }
+                confirmAction({
+                  title: 'Delete Task',
+                  message: `Are you sure you want to delete "${editingTask?.title || 'this task'}"? This action cannot be undone.`,
+                  confirmText: 'Delete Task',
+                  variant: 'danger',
+                  onConfirm: () => {
+                    deleteTask(editingTask.id);
+                    setEditingTask(null);
+                  },
+                });
               }}
               className="text-sm font-semibold text-red-600 hover:text-red-700 dark:hover:text-red-400 transition-colors cursor-pointer"
             >

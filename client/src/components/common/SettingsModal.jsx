@@ -42,6 +42,7 @@ export const SettingsModal = () => {
     refreshData,
     testDingDongChime,
     simulateSampleNewTicket,
+    confirmAction,
   } = useTasks();
 
   const [newCatName, setNewCatName] = useState('');
@@ -912,7 +913,15 @@ export const SettingsModal = () => {
                     </span>
                   </div>
                   <button
-                    onClick={() => deleteCategory(c.id)}
+                    onClick={() => {
+                      confirmAction({
+                        title: 'Delete Category Tag',
+                        message: `Are you sure you want to delete tag "${c.name}"?`,
+                        confirmText: 'Delete Tag',
+                        variant: 'danger',
+                        onConfirm: () => deleteCategory(c.id),
+                      });
+                    }}
                     className="p-1 text-slate-400 hover:text-red-500 transition-colors cursor-pointer"
                     title="Delete project"
                   >

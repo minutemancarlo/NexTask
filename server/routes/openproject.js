@@ -840,7 +840,8 @@ router.post('/sync', async (req, res) => {
 
         return {
           opId,
-          title: `#${opId} - ${wp.subject || 'Work Package'}`,
+          subject: wp.subject,
+          title: wp.subject || 'Work Package',
           quadrant: calculatedQuadrant,
           status: mappedStatus,
           dueDate: wp.dueDate || null,
@@ -871,7 +872,7 @@ router.post('/sync', async (req, res) => {
     try {
       for (const t of ticketsToSync) {
         const opId = Number(t.opId);
-        const title = t.title || `#${opId}`;
+        const title = t.subject || t.title || `#${opId}`;
         const quadrant = t.quadrant || 'Q2';
         const status = t.status || 'todo';
         const dueDate = t.dueDate || null;

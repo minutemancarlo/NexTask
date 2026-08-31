@@ -107,7 +107,8 @@ export const SyncReviewModal = () => {
       .filter((c) => c.selectedForSync)
       .map((c) => ({
         opId: c.opId,
-        title: c.formattedTitle || `#${c.opId} - ${c.subject}`,
+        subject: c.subject,
+        title: c.subject || c.formattedTitle || `#${c.opId}`,
         quadrant: c.selectedQuadrant,
         status: c.selectedStatus,
         categoryId: c.selectedCategoryId || null,

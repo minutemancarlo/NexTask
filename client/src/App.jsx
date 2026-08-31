@@ -9,6 +9,7 @@ import { TaskModal } from './components/task/TaskModal';
 import { SettingsModal } from './components/common/SettingsModal';
 import { SyncReviewModal } from './components/openproject/SyncReviewModal';
 import { NewTicketToast } from './components/common/NewTicketToast';
+import { ConfirmModal } from './components/common/ConfirmModal';
 import { PomodoroTimer } from './components/pomodoro/PomodoroTimer';
 import { useTasks } from './context/TaskContext';
 import { AlertCircle, RefreshCw } from 'lucide-react';
@@ -108,6 +109,9 @@ function AppContent() {
 
       {/* Realtime New Ticket Toast & Audio Notification */}
       <NewTicketToast />
+
+      {/* Global In-App Confirmation Dialog */}
+      <ConfirmModal />
 
       {/* Floating Pomodoro Focus Timer */}
       <PomodoroTimer />

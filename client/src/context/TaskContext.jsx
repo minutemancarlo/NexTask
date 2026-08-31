@@ -19,8 +19,29 @@ export const TaskProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Real-Time / Periodic New Ticket Monitoring State
-  const [activeNewTicketAlert, setActiveNewTicketAlert] = useState(null);
+  // Custom In-App Confirmation Modal State (No native confirm/alert)
+  const [confirmDialog, setConfirmDialog] = useState(null); // { title, message, confirmText, cancelText, variant, onConfirm }
+
+  const confirmAction = useCallback(({ title, message, confirmText = 'Confirm', cancelText = 'Cancel', variant = 'danger', onConfirm }) => {
+    setConfirmDialog({
+      title,
+      message,
+      confirmText,
+      cancelText,
+      variant,
+      onConfirm: () => {
+        if (typeof onConfirm === 'function') onConfirm();
+        setConfirmDialog(null);
+      },
+    });
+  }, []);
+
+  const closeConfirmDialog = useCallback(() => {
+    setConfirmDialog(null);
+  }, []);
+
+  // Real-Time / Periodic New Ticket Monitoring Queue State (Multiple notifications support)
+  const [activeNewTicketAlerts, setActiveNewTicketAlerts] = useState([]);
   const [isMonitoringActive, setIsMonitoringActive] = useState(false);
   const [lastMonitoredAt, setLastMonitoredAt] = useState(null);
   const [notifiedTicketIds, setNotifiedTicketIds] = useState(() => {
@@ -248,27 +269,49 @@ export const TaskProvider = ({ children }) => {
     const quadrant = targetQuadrant || ticket.suggestedQuadrant || 'Q1';
     const approvedTicket = {
       ...ticket,
+      title: ticket.subject || ticket.formattedTitle || `#${ticket.opId}`,
       suggestedQuadrant: quadrant,
       suggestedStatus: 'todo',
       selectedForSync: true,
     };
     try {
       await commitSyncReview([approvedTicket]);
-      setActiveNewTicketAlert(null);
+      dismissNewTicketAlert(ticket.opId);
     } catch (e) {
       console.error('Failed to quick sync new ticket:', e);
     }
   };
 
-  const dismissNewTicketAlert = () => {
-    setActiveNewTicketAlert(null);
+  const quickSyncAllNewTickets = async () => {
+    if (activeNewTicketAlerts.length === 0) return;
+    const approvedTickets = activeNewTicketAlerts.map(t => ({
+      ...t,
+      title: t.subject || t.formattedTitle || `#${t.opId}`,
+      suggestedQuadrant: t.suggestedQuadrant || 'Q1',
+      suggestedStatus: 'todo',
+      selectedForSync: true,
+    }));
+    try {
+      await commitSyncReview(approvedTickets);
+      setActiveNewTicketAlerts([]);
+    } catch (e) {
+      console.error('Failed to quick sync all new tickets:', e);
+    }
+  };
+
+  const dismissNewTicketAlert = (opId) => {
+    if (!opId) {
+      setActiveNewTicketAlerts([]); // Dismiss all
+    } else {
+      setActiveNewTicketAlerts(prev => prev.filter(t => t.opId !== opId));
+    }
   };
 
   const testDingDongChime = () => {
     playDingDongSound();
   };
 
-  // Simulate a Sample New Ticket arrival (triggers Ding-Dong sound, toast alert, and notification)
+  // Simulate a Sample New Ticket arrival (accumulates in activeNewTicketAlerts queue)
   const simulateSampleNewTicket = () => {
     const sampleId = Math.floor(50500 + Math.random() * 500);
     const sampleProjects = ['Axis Core Banking', 'SMADs Financial Services', 'Treasury & Risk Management', 'Digital Mobile Banking'];
@@ -279,6 +322,7 @@ export const TaskProvider = ({ children }) => {
       'Account Ledger Sync Mismatch during EOD Clearing Batch',
       'High Priority Audit Trail Logging Failure in Transfer Service',
       'OAuth2 Token Expiration on Multi-Factor Authentication',
+      'Database Connection Pool Exhaustion on Report Generation',
     ];
 
     const randomSubject = sampleSubjects[Math.floor(Math.random() * sampleSubjects.length)];
@@ -288,6 +332,7 @@ export const TaskProvider = ({ children }) => {
     const sampleTicket = {
       opId: sampleId,
       subject: randomSubject,
+      title: randomSubject, // Set title strictly to Subject
       formattedTitle: `#${sampleId} - ${randomSubject}`,
       dueDate: new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0],
       qaContact: 'Elena Rostova (Lead QA)',
@@ -311,11 +356,11 @@ export const TaskProvider = ({ children }) => {
       openSyncReview({ projectId: sampleTicket.projectName });
     });
 
-    // Display In-App Floating Toast
-    setActiveNewTicketAlert({
-      count: 1,
-      latestTicket: sampleTicket,
-      tickets: [sampleTicket],
+    // Accumulate in unseen ticket alerts queue (Newest first, without removing existing unseen ones)
+    setActiveNewTicketAlerts(prev => {
+      const existingIds = new Set(prev.map(t => t.opId));
+      if (existingIds.has(sampleTicket.opId)) return prev;
+      return [sampleTicket, ...prev];
     });
   };
 
@@ -367,11 +412,11 @@ export const TaskProvider = ({ children }) => {
               });
             }
 
-            // Trigger In-App Floating Toast Alert
-            setActiveNewTicketAlert({
-              count: unnotifiedTickets.length,
-              latestTicket: unnotifiedTickets[0],
-              tickets: unnotifiedTickets,
+            // Accumulate in unseen ticket alerts queue (newest first, preserving existing unseen ones)
+            setActiveNewTicketAlerts(prev => {
+              const existingIds = new Set(prev.map(t => t.opId));
+              const additions = unnotifiedTickets.filter(t => !existingIds.has(t.opId));
+              return [...additions, ...prev];
             });
 
             // If auto-sync is enabled in settings, auto-commit them directly
@@ -478,9 +523,15 @@ export const TaskProvider = ({ children }) => {
         commitSyncReview,
         purgeAllTasks,
         refreshData: fetchData,
+        // Confirmation Modal
+        confirmDialog,
+        confirmAction,
+        closeConfirmDialog,
         // Live Monitoring & Sound
-        activeNewTicketAlert,
+        activeNewTicketAlerts,
+        activeNewTicketAlert: activeNewTicketAlerts.length > 0 ? { count: activeNewTicketAlerts.length, latestTicket: activeNewTicketAlerts[0], tickets: activeNewTicketAlerts } : null,
         quickSyncNewTicket,
+        quickSyncAllNewTickets,
         dismissNewTicketAlert,
         testDingDongChime,
         simulateSampleNewTicket,

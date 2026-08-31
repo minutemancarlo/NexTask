@@ -22,6 +22,7 @@ export const ListView = () => {
     setEditingTask,
     activeTimerTask,
     setActiveTimerTask,
+    confirmAction,
   } = useTasks();
 
   const [sortBy, setSortBy] = useState('due_date'); // 'due_date' | 'quadrant' | 'title'
@@ -260,9 +261,13 @@ export const ListView = () => {
                           </button>
                           <button
                             onClick={() => {
-                              if (window.confirm('Delete this task?')) {
-                                deleteTask(task.id);
-                              }
+                              confirmAction({
+                                title: 'Delete Task',
+                                message: `Are you sure you want to delete "${task.title}"? This action cannot be undone.`,
+                                confirmText: 'Delete Task',
+                                variant: 'danger',
+                                onConfirm: () => deleteTask(task.id),
+                              });
                             }}
                             className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 dark:hover:text-red-400 cursor-pointer"
                             title="Delete"
