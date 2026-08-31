@@ -11,7 +11,7 @@ import { SyncReviewModal } from './components/openproject/SyncReviewModal';
 import { NewTicketToast } from './components/common/NewTicketToast';
 import { ConfirmModal } from './components/common/ConfirmModal';
 import { PomodoroTimer } from './components/pomodoro/PomodoroTimer';
-import { useTasks } from './context/TaskContext';
+import { useTasks, TaskProvider } from './context/TaskContext';
 import { AlertCircle, RefreshCw } from 'lucide-react';
 
 class ErrorBoundary extends React.Component {
@@ -121,8 +121,10 @@ function AppContent() {
 
 export default function App() {
   return (
-    <ErrorBoundary>
-      <AppContent />
-    </ErrorBoundary>
+    <TaskProvider>
+      <ErrorBoundary>
+        <AppContent />
+      </ErrorBoundary>
+    </TaskProvider>
   );
 }
