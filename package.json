@@ -1,0 +1,10 @@
+{
+  "name": "nextask",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "server": "node server/server.js",
+    "client": "npm --prefix client run dev",
+    "dev": "node start-dev.js"
+  }
+}
