@@ -44,14 +44,8 @@ export const TaskProvider = ({ children }) => {
   const [activeNewTicketAlerts, setActiveNewTicketAlerts] = useState([]);
   const [isMonitoringActive, setIsMonitoringActive] = useState(false);
   const [lastMonitoredAt, setLastMonitoredAt] = useState(null);
-  const [notifiedTicketIds, setNotifiedTicketIds] = useState(() => {
-    try {
-      const saved = localStorage.getItem('nextask_notified_tickets');
-      return saved ? new Set(JSON.parse(saved)) : new Set();
-    } catch (e) {
-      return new Set();
-    }
-  });
+  // Session-based tracking so unsynced new tickets are automatically captured on app start
+  const [notifiedTicketIds, setNotifiedTicketIds] = useState(new Set());
 
   // Filters & Views
   const [activeView, setActiveView] = useState('matrix'); // 'matrix' | 'kanban' | 'list' | 'openproject'
@@ -281,6 +275,8 @@ export const TaskProvider = ({ children }) => {
     const approvedTicket = {
       ...ticket,
       title: ticket.subject || ticket.formattedTitle || `#${ticket.opId}`,
+      delegatee: ticket.qaContact || ticket.delegatee || null,
+      categoryId: ticket.suggestedCategoryId || ticket.categoryId || null,
       suggestedQuadrant: quadrant,
       suggestedStatus: 'todo',
       selectedForSync: true,
@@ -298,6 +294,8 @@ export const TaskProvider = ({ children }) => {
     const approvedTickets = activeNewTicketAlerts.map(t => ({
       ...t,
       title: t.subject || t.formattedTitle || `#${t.opId}`,
+      delegatee: t.qaContact || t.delegatee || null,
+      categoryId: t.suggestedCategoryId || t.categoryId || null,
       suggestedQuadrant: t.suggestedQuadrant || 'Q1',
       suggestedStatus: 'todo',
       selectedForSync: true,

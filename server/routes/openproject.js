@@ -878,8 +878,8 @@ router.post('/sync', async (req, res) => {
         const quadrant = t.quadrant || 'Q2';
         const status = t.status || 'todo';
         const dueDate = t.dueDate || null;
-        const categoryId = t.categoryId || null;
-        const delegatee = t.delegatee || null;
+        const categoryId = t.categoryId || t.suggestedCategoryId || null;
+        const delegatee = t.delegatee || t.qaContact || null;
         const severity = t.severity || null;
         const ticketUrl = t.ticketUrl || null;
 
