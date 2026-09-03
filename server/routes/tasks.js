@@ -368,13 +368,21 @@ router.post('/export-excel', async (req, res) => {
       views: [{ state: 'frozen', ySplit: 1 }],
     });
 
+    const totalCount = tasks.length;
+    const completedCount = tasks.filter(t => {
+      const s = String(t.status || '').toLowerCase();
+      return s === 'completed' || s.includes('done') || s.includes('closed') || s.includes('resolved') || s.includes('fixed');
+    }).length;
+    const percentage = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+    const progressSummary = `${completedCount}/${totalCount} Done (${percentage}%)`;
+
     sheet.columns = [
       { header: 'No.', key: 'no', width: 8 },
       { header: 'OpenProject ID', key: 'openproject_id', width: 18 },
       { header: 'Title', key: 'title', width: 44 },
       { header: 'Description', key: 'description', width: 50 },
       { header: 'Quadrant (Priority)', key: 'quadrant', width: 34 },
-      { header: 'Status', key: 'status', width: 22 },
+      { header: `Status • ${progressSummary}`, key: 'status', width: 28 },
       { header: 'Severity', key: 'severity', width: 16 },
       { header: 'Delegatee / QA', key: 'delegatee', width: 26 },
       { header: 'Due Date', key: 'due_date', width: 16 },
@@ -578,6 +586,49 @@ router.post('/export-excel', async (req, res) => {
           right: { style: 'thin', color: { argb: 'FFE2E8F0' } },
         };
       });
+    });
+
+    // Spacer row
+    sheet.addRow({});
+
+    // Summary Progress Row displaying percentage (e.g. 9/28 Done (32%))
+    const summaryRow = sheet.addRow({
+      no: '',
+      openproject_id: 'SUMMARY',
+      title: `Total: ${totalCount} Tasks (${completedCount} Completed, ${totalCount - completedCount} Pending)`,
+      description: '',
+      quadrant: '',
+      status: progressSummary,
+      severity: '',
+      delegatee: '',
+      due_date: '',
+      created_at: `Generated: ${new Date().toISOString().split('T')[0]}`,
+      completed_at: `${percentage}% Complete`,
+    });
+
+    summaryRow.height = 26;
+    summaryRow.font = { name: 'Segoe UI', size: 10, bold: true, color: { argb: 'FF065F46' } }; // Emerald-800
+    summaryRow.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FFECFDF5' }, // Emerald-50
+    };
+
+    summaryRow.getCell(2).alignment = { vertical: 'middle', horizontal: 'center' };
+    summaryRow.getCell(3).alignment = { vertical: 'middle', horizontal: 'left' };
+    summaryRow.getCell(6).alignment = { vertical: 'middle', horizontal: 'center' };
+    summaryRow.getCell(6).font = { name: 'Segoe UI', size: 11, bold: true, color: { argb: 'FF047857' } }; // Emerald-700
+    summaryRow.getCell(10).alignment = { vertical: 'middle', horizontal: 'center' };
+    summaryRow.getCell(11).alignment = { vertical: 'middle', horizontal: 'center' };
+    summaryRow.getCell(11).font = { name: 'Segoe UI', size: 11, bold: true, color: { argb: 'FF047857' } };
+
+    summaryRow.eachCell({ includeEmpty: true }, (cell) => {
+      cell.border = {
+        top: { style: 'thin', color: { argb: 'FF10B981' } },
+        bottom: { style: 'double', color: { argb: 'FF059669' } },
+        left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+        right: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+      };
     });
 
     const filename = `nextask-tasks-report-${new Date().toISOString().split('T')[0]}.xlsx`;
