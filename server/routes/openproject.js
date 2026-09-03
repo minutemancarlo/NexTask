@@ -682,6 +682,10 @@ router.post('/fetch-candidates', async (req, res) => {
         newCount++;
       }
 
+      const assigneeTitle = wp._links?.assignee?.title || wp.assignee || 'Unassigned';
+      const assigneeHref = wp._links?.assignee?.href || '';
+      const assigneeIdVal = assigneeHref ? assigneeHref.split('/').pop() : (wp._links?.assignee?.id ? String(wp._links.assignee.id) : null);
+
       candidates.push({
         opId,
         subject,
@@ -692,6 +696,8 @@ router.post('/fetch-candidates', async (req, res) => {
         priorityTitle,
         projectName,
         ticketUrl,
+        assigneeName: assigneeTitle,
+        assigneeId: assigneeIdVal,
         opStatusTitle,
         opMappedStatus,
         isSynced,
@@ -722,7 +728,9 @@ router.post('/fetch-candidates', async (req, res) => {
 });
 
 // GET /api/openproject/poll-new
-// Lightweight periodic check for tickets with status = 'New' that haven't been synced to SQLite yet.
+// Lightweight periodic check for:
+// 1. Unsynced tickets with status = 'New'
+// 2. Existing active synced tickets whose assignee has changed in OpenProject
 router.get('/poll-new', async (req, res) => {
   try {
     const config = getOpenProjectConfig();
@@ -731,14 +739,15 @@ router.get('/poll-new', async (req, res) => {
     const mock = req.query.mock === 'true' || config?.mock === true;
 
     if (!mock && (!host || !apiKey)) {
-      return res.json({ success: true, active: false, newTickets: [] });
+      return res.json({ success: true, active: false, newTickets: [], reassignedTickets: [] });
     }
 
     const projectId = req.query.projectId || config?.projectId;
     const allowedProjectIds = config?.allowedProjectIds || [];
     const assigneeId = req.query.assigneeId || config?.assigneeId || 'me';
+    const cleanHost = normalizeHost(host || 'https://openproject.local');
 
-    // Status is strictly 'New' (ID 1 in standard OpenProject schemas)
+    // 1. Poll for New Unsynced Tickets
     const workPackages = await fetchRawWorkPackages({
       host,
       apiKey,
@@ -749,8 +758,6 @@ router.get('/poll-new', async (req, res) => {
       statusOperator: '=',
       mock
     });
-
-    const cleanHost = normalizeHost(host || 'https://openproject.local');
 
     // Get all existing openproject_ids already synced to SQLite
     const existingRows = db.prepare('SELECT openproject_id FROM tasks WHERE openproject_id IS NOT NULL').all();
@@ -789,11 +796,174 @@ router.get('/poll-new', async (req, res) => {
       }
     }
 
+    // 2. Check for Assignee Changes on active synced tasks
+    const activeTasks = db.prepare(`
+      SELECT t.id, t.title, t.openproject_id, t.openproject_url, t.openproject_assignee, t.openproject_assignee_id,
+             c.name as category_name
+      FROM tasks t
+      LEFT JOIN categories c ON t.category_id = c.id
+      WHERE t.openproject_id IS NOT NULL AND t.status != 'completed'
+    `).all();
+
+    const reassignedTickets = [];
+
+    if (activeTasks.length > 0) {
+      if (mock) {
+        // Mock mode reassignment check
+        const allMockPackages = [
+          {
+            id: 201,
+            subject: 'Payment Gateway Race Condition on Double Submit',
+            _links: {
+              priority: { title: 'Immediate' },
+              status: { title: 'In Progress', id: '7' },
+              assignee: { title: 'Michael Chen', id: '1' },
+              qaContact: { title: 'Elena Rostova (QA Lead)' },
+              project: { title: 'Software Development Core', href: '/openproject/api/v3/projects/mock-p1' }
+            },
+            severity: 'Critical',
+          },
+          {
+            id: 202,
+            subject: 'Refactor Authentication Middleware for OAuth2 Providers',
+            _links: {
+              priority: { title: 'High' },
+              status: { title: 'New', id: '1' },
+              assignee: { title: 'Michael Chen', id: '1' },
+              qaContact: { title: 'Marcus Bell (QA Engineer)' },
+              project: { title: 'Software Development Core', href: '/openproject/api/v3/projects/mock-p1' }
+            },
+            severity: 'Major',
+          },
+          {
+            id: 203,
+            subject: 'Fix Session Token Expiration Bug on Mobile Safari',
+            _links: {
+              priority: { title: 'High' },
+              status: { title: 'Re-Opened', id: '16' },
+              assignee: { title: 'Sarah Jenkins', id: '2' },
+              qaContact: { title: 'Elena Rostova (QA Lead)' },
+              project: { title: 'Operations & Infrastructure', href: '/openproject/api/v3/projects/mock-p2' }
+            },
+            severity: 'Major',
+          },
+          {
+            id: 204,
+            subject: 'Deprecated Typography Warnings in Legacy CSS Bundle',
+            _links: {
+              priority: { title: 'Low' },
+              status: { title: 'New', id: '1' },
+              assignee: { title: 'David Miller', id: '3' },
+              qaContact: { title: 'Chloe Vance (QA)' },
+              project: { title: 'Product Marketing Q3', href: '/openproject/api/v3/projects/mock-p3' }
+            },
+            severity: 'Minor',
+          },
+          {
+            id: 205,
+            subject: 'Historical Archived Migration Bug',
+            _links: {
+              priority: { title: 'Normal' },
+              status: { title: 'Closed', id: '13' },
+              assignee: { title: 'Michael Chen', id: '1' },
+              qaContact: { title: 'Elena Rostova' },
+              project: { title: 'Software Development Core', href: '/openproject/api/v3/projects/mock-p1' }
+            },
+            severity: 'Normal',
+          }
+        ];
+
+        for (const task of activeTasks) {
+          const wp = allMockPackages.find(m => m.id === Number(task.openproject_id));
+          if (wp) {
+            const currentAssignee = wp._links?.assignee?.title || 'Unassigned';
+            const currentAssigneeId = wp._links?.assignee?.id ? String(wp._links.assignee.id) : '';
+
+            let isReassigned = false;
+            if (task.openproject_assignee && currentAssignee.toLowerCase() !== task.openproject_assignee.toLowerCase()) {
+              isReassigned = true;
+            } else if (task.openproject_assignee_id && currentAssigneeId && currentAssigneeId !== task.openproject_assignee_id) {
+              isReassigned = true;
+            }
+
+            if (isReassigned) {
+              reassignedTickets.push({
+                taskId: task.id,
+                opId: Number(task.openproject_id),
+                subject: task.title,
+                formattedTitle: `#${task.openproject_id} - ${task.title}`,
+                previousAssignee: task.openproject_assignee || 'You (Assigned User)',
+                newAssignee: currentAssignee,
+                newAssigneeId: currentAssigneeId,
+                projectName: task.category_name || wp._links?.project?.title || '',
+                ticketUrl: task.openproject_url || `${cleanHost}/work_packages/${task.openproject_id}`,
+                reassignedAt: new Date().toISOString(),
+              });
+            }
+          }
+        }
+      } else {
+        // Live OpenProject mode: Fetch work packages by IDs
+        try {
+          const opIds = activeTasks.map(t => Number(t.openproject_id)).filter(Boolean);
+          if (opIds.length > 0) {
+            const filterObj = [{ id: { operator: '=', values: opIds.map(String) } }];
+            const fetchUrl = `${cleanHost}/api/v3/work_packages?pageSize=200&filters=${encodeURIComponent(JSON.stringify(filterObj))}`;
+            const fetchRes = await fetch(fetchUrl, {
+              method: 'GET',
+              headers: getHeaders(apiKey),
+            });
+
+            if (fetchRes.ok) {
+              const data = await fetchRes.json();
+              const elements = data._embedded?.elements || [];
+
+              for (const wp of elements) {
+                const wpId = Number(wp.id);
+                const task = activeTasks.find(t => Number(t.openproject_id) === wpId);
+                if (task) {
+                  const currentAssignee = wp._links?.assignee?.title || 'Unassigned';
+                  const currentAssigneeHref = wp._links?.assignee?.href || '';
+                  const currentAssigneeId = currentAssigneeHref ? currentAssigneeHref.split('/').pop() : null;
+
+                  let isReassigned = false;
+                  if (task.openproject_assignee && currentAssignee.trim().toLowerCase() !== task.openproject_assignee.trim().toLowerCase()) {
+                    isReassigned = true;
+                  } else if (task.openproject_assignee_id && currentAssigneeId && currentAssigneeId !== task.openproject_assignee_id) {
+                    isReassigned = true;
+                  }
+
+                  if (isReassigned) {
+                    reassignedTickets.push({
+                      taskId: task.id,
+                      opId: wpId,
+                      subject: task.title || wp.subject || `Work Package #${wpId}`,
+                      formattedTitle: `#${wpId} - ${task.title || wp.subject}`,
+                      previousAssignee: task.openproject_assignee || 'You (Assigned User)',
+                      newAssignee: currentAssignee,
+                      newAssigneeId: currentAssigneeId,
+                      projectName: task.category_name || wp._links?.project?.title || '',
+                      ticketUrl: task.openproject_url || `${cleanHost}/work_packages/${wpId}`,
+                      reassignedAt: new Date().toISOString(),
+                    });
+                  }
+                }
+              }
+            }
+          }
+        } catch (fetchErr) {
+          console.warn('[NexTask Monitor] Failed to check work package assignees:', fetchErr.message);
+        }
+      }
+    }
+
     res.json({
       success: true,
       active: true,
       count: unsyncedNewTickets.length,
       newTickets: unsyncedNewTickets,
+      reassignedCount: reassignedTickets.length,
+      reassignedTickets,
       checkedAt: new Date().toISOString()
     });
   } catch (error) {
@@ -839,6 +1009,9 @@ router.post('/sync', async (req, res) => {
         const priorityTitle = wp._links?.priority?.title || '';
         const calculatedQuadrant = defaultQuadrant || mapSeverityToQuadrant(severity, priorityTitle);
         const categoryId = matchOrCreateClaritiCategory(wp._links?.project);
+        const assignee = wp._links?.assignee?.title || wp.assignee || null;
+        const assigneeHref = wp._links?.assignee?.href || '';
+        const assigneeIdVal = assigneeHref ? assigneeHref.split('/').pop() : (wp._links?.assignee?.id ? String(wp._links.assignee.id) : null);
 
         return {
           opId,
@@ -850,6 +1023,8 @@ router.post('/sync', async (req, res) => {
           delegatee: qaContact,
           severity,
           categoryId,
+          assigneeName: assignee,
+          assigneeId: assigneeIdVal,
           ticketUrl: `${cleanHost}/work_packages/${opId}`
         };
       }).filter(Boolean);
@@ -858,15 +1033,16 @@ router.post('/sync', async (req, res) => {
     let inserted = 0;
     let updated = 0;
 
-    const findExisting = db.prepare('SELECT id, quadrant, status, category_id FROM tasks WHERE openproject_id = ?');
+    const findExisting = db.prepare('SELECT id, quadrant, status, category_id, completed_at FROM tasks WHERE openproject_id = ?');
     const insertStmt = db.prepare(`
-      INSERT INTO tasks (id, title, description, quadrant, status, due_date, category_id, delegatee, severity, openproject_id, openproject_url, pomodoro_count)
-      VALUES (?, ?, '', ?, ?, ?, ?, ?, ?, ?, ?, 0)
+      INSERT INTO tasks (id, title, description, quadrant, status, due_date, category_id, delegatee, severity, openproject_id, openproject_url, openproject_assignee, openproject_assignee_id, pomodoro_count, completed_at)
+      VALUES (?, ?, '', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)
     `);
     const updateStmt = db.prepare(`
       UPDATE tasks
       SET title = ?, description = '', quadrant = ?, status = ?, due_date = ?, category_id = ?,
-          delegatee = ?, severity = ?, openproject_url = ?, updated_at = CURRENT_TIMESTAMP
+          delegatee = ?, severity = ?, openproject_url = ?, openproject_assignee = COALESCE(?, openproject_assignee),
+          openproject_assignee_id = COALESCE(?, openproject_assignee_id), completed_at = ?, updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
     `);
 
@@ -882,8 +1058,12 @@ router.post('/sync', async (req, res) => {
         const delegatee = t.delegatee || t.qaContact || null;
         const severity = t.severity || null;
         const ticketUrl = t.ticketUrl || null;
+        const assigneeName = t.assigneeName || t.assignee || null;
+        const assigneeIdVal = t.assigneeId ? String(t.assigneeId) : null;
 
         const existing = findExisting.get(opId);
+        const completedAt = status === 'completed' ? (existing?.completed_at || new Date().toISOString()) : null;
+
         if (existing) {
           updateStmt.run(
             title,
@@ -894,6 +1074,9 @@ router.post('/sync', async (req, res) => {
             delegatee,
             severity,
             ticketUrl,
+            assigneeName,
+            assigneeIdVal,
+            completedAt,
             existing.id
           );
           updated++;
@@ -909,7 +1092,10 @@ router.post('/sync', async (req, res) => {
             delegatee,
             severity,
             opId,
-            ticketUrl
+            ticketUrl,
+            assigneeName,
+            assigneeIdVal,
+            completedAt
           );
           inserted++;
         }
