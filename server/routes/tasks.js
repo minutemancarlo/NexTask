@@ -447,7 +447,7 @@ router.post('/export-excel', async (req, res) => {
     createCard(1, 2, 'OVERALL PROGRESS', progressSummary, `${totalCount} Total Items`, 'FFECFDF5', 'FF10B981', 'FF047857', 'FF065F46');
     createCard(3, 4, 'TO DO', todoCount, 'Pending Action', 'FFF0F9FF', 'FF38BDF8', 'FF0369A1', 'FF0284C7');
     createCard(5, 6, 'IN PROGRESS', inProgressCount, 'Currently Active', 'FFFFFBEB', 'FFFBBF24', 'FFB45309', 'FFD97706');
-    createCard(7, 8, 'DELEGATED / WAITING', delegatedCount, 'QA & Review', 'FFEEF2FF', 'FF818CF8', 'FF4338CA', 'FF4F46E5');
+    createCard(7, 8, 'DELEGATED / WAITING', delegatedCount, 'On Queue', 'FFEEF2FF', 'FF818CF8', 'FF4338CA', 'FF4F46E5');
     createCard(9, 11, 'COMPLETED', completedCount, `${percentage}% Finished`, 'FFECFDF5', 'FF34D399', 'FF047857', 'FF059669');
 
     // Row 6: Spacer row
