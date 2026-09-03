@@ -398,7 +398,7 @@ router.post('/export-excel', async (req, res) => {
     // Row 2: Subtitle Metadata
     sheet.mergeCells('A2:K2');
     const subCell = sheet.getCell('A2');
-    subCell.value = `Report Generated: ${new Date().toISOString().split('T')[0]} | Total Tasks: ${totalCount} | Overall Progress: ${progressSummary} | Source: NexTask`;
+    subCell.value = `Report Generated: ${new Date().toISOString().split('T')[0]}`;
     subCell.font = { name: 'Segoe UI', size: 9, italic: true, color: { argb: 'FF475569' } };
     subCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
     subCell.alignment = { vertical: 'middle', horizontal: 'center' };
@@ -659,49 +659,6 @@ router.post('/export-excel', async (req, res) => {
           right: { style: 'thin', color: { argb: 'FFE2E8F0' } },
         };
       });
-    });
-
-    // Spacer row
-    sheet.addRow([]);
-
-    // Summary Progress Row displaying percentage (e.g. 9/28 Done (32%))
-    const summaryRow = sheet.addRow([
-      '',
-      'SUMMARY',
-      `Total: ${totalCount} Tasks (${completedCount} Completed, ${totalCount - completedCount} Pending)`,
-      '',
-      '',
-      progressSummary,
-      '',
-      '',
-      '',
-      `Generated: ${new Date().toISOString().split('T')[0]}`,
-      `${percentage}% Complete`,
-    ]);
-
-    summaryRow.height = 26;
-    summaryRow.font = { name: 'Segoe UI', size: 10, bold: true, color: { argb: 'FF065F46' } }; // Emerald-800
-    summaryRow.fill = {
-      type: 'pattern',
-      pattern: 'solid',
-      fgColor: { argb: 'FFECFDF5' }, // Emerald-50
-    };
-
-    summaryRow.getCell(2).alignment = { vertical: 'middle', horizontal: 'center' };
-    summaryRow.getCell(3).alignment = { vertical: 'middle', horizontal: 'left' };
-    summaryRow.getCell(6).alignment = { vertical: 'middle', horizontal: 'center' };
-    summaryRow.getCell(6).font = { name: 'Segoe UI', size: 11, bold: true, color: { argb: 'FF047857' } }; // Emerald-700
-    summaryRow.getCell(10).alignment = { vertical: 'middle', horizontal: 'center' };
-    summaryRow.getCell(11).alignment = { vertical: 'middle', horizontal: 'center' };
-    summaryRow.getCell(11).font = { name: 'Segoe UI', size: 11, bold: true, color: { argb: 'FF047857' } };
-
-    summaryRow.eachCell({ includeEmpty: true }, (cell) => {
-      cell.border = {
-        top: { style: 'thin', color: { argb: 'FF10B981' } },
-        bottom: { style: 'double', color: { argb: 'FF059669' } },
-        left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
-        right: { style: 'thin', color: { argb: 'FFE2E8F0' } },
-      };
     });
 
     const filename = `nextask-tasks-report-${new Date().toISOString().split('T')[0]}.xlsx`;
