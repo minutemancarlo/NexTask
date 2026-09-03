@@ -364,51 +364,124 @@ router.post('/export-excel', async (req, res) => {
     workbook.creator = 'NexTask Task Manager';
     workbook.created = new Date();
 
-    const sheet = workbook.addWorksheet('Tasks Report', {
-      views: [{ state: 'frozen', ySplit: 1 }],
-    });
-
     const totalCount = tasks.length;
     const completedCount = tasks.filter(t => {
       const s = String(t.status || '').toLowerCase();
       return s === 'completed' || s.includes('done') || s.includes('closed') || s.includes('resolved') || s.includes('fixed');
     }).length;
+    const todoCount = tasks.filter(t => t.status === 'todo').length;
+    const inProgressCount = tasks.filter(t => t.status === 'in_progress').length;
+    const delegatedCount = tasks.filter(t => t.status === 'delegated').length;
+
     const percentage = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
     const progressSummary = `${completedCount}/${totalCount} Done (${percentage}%)`;
 
-    sheet.columns = [
-      { header: 'No.', key: 'no', width: 8 },
-      { header: 'OpenProject ID', key: 'openproject_id', width: 18 },
-      { header: 'Title', key: 'title', width: 44 },
-      { header: 'Description', key: 'description', width: 50 },
-      { header: 'Quadrant (Priority)', key: 'quadrant', width: 34 },
-      { header: `Status • ${progressSummary}`, key: 'status', width: 28 },
-      { header: 'Severity', key: 'severity', width: 16 },
-      { header: 'Delegatee / QA', key: 'delegatee', width: 26 },
-      { header: 'Due Date', key: 'due_date', width: 16 },
-      { header: 'Created / Sync Date', key: 'created_at', width: 22 },
-      { header: 'Completion Date', key: 'completed_at', width: 22 },
-    ];
+    const sheet = workbook.addWorksheet('Tasks Report', {
+      views: [{ state: 'frozen', ySplit: 7 }],
+    });
 
-    // Header Styling (Dark Indigo with bold white text)
-    const headerRow = sheet.getRow(1);
-    headerRow.height = 28;
-    headerRow.font = { name: 'Segoe UI', size: 11, bold: true, color: { argb: 'FFFFFFFF' } };
-    headerRow.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
-    headerRow.fill = {
-      type: 'pattern',
-      pattern: 'solid',
-      fgColor: { argb: 'FF312E81' }, // Indigo-900
+    // Set Column Widths (Cols 1 to 11)
+    const colWidths = [8, 18, 44, 48, 32, 24, 16, 26, 16, 22, 22];
+    colWidths.forEach((w, i) => {
+      sheet.getColumn(i + 1).width = w;
+    });
+
+    // Row 1: Dashboard Header Banner
+    sheet.mergeCells('A1:K1');
+    const titleCell = sheet.getCell('A1');
+    titleCell.value = 'NEXTASK • TASK EXECUTION & STATUS DASHBOARD';
+    titleCell.font = { name: 'Segoe UI', size: 12, bold: true, color: { argb: 'FFFFFFFF' } };
+    titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E1B4B' } }; // Deep Indigo
+    titleCell.alignment = { vertical: 'middle', horizontal: 'center' };
+    sheet.getRow(1).height = 28;
+
+    // Row 2: Subtitle Metadata
+    sheet.mergeCells('A2:K2');
+    const subCell = sheet.getCell('A2');
+    subCell.value = `Report Generated: ${new Date().toISOString().split('T')[0]} | Total Tasks: ${totalCount} | Overall Progress: ${progressSummary} | Source: NexTask`;
+    subCell.font = { name: 'Segoe UI', size: 9, italic: true, color: { argb: 'FF475569' } };
+    subCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+    subCell.alignment = { vertical: 'middle', horizontal: 'center' };
+    sheet.getRow(2).height = 18;
+
+    // Helper to style each KPI Card across Rows 3 to 5
+    const createCard = (startCol, endCol, label, value, subtext, fgColor, borderArgb, textArgb, valueArgb) => {
+      sheet.mergeCells(3, startCol, 3, endCol);
+      sheet.mergeCells(4, startCol, 4, endCol);
+      sheet.mergeCells(5, startCol, 5, endCol);
+
+      const topCell = sheet.getCell(3, startCol);
+      topCell.value = label;
+      topCell.font = { name: 'Segoe UI', size: 9, bold: true, color: { argb: textArgb } };
+      topCell.alignment = { vertical: 'middle', horizontal: 'center' };
+
+      const valCell = sheet.getCell(4, startCol);
+      valCell.value = value;
+      valCell.font = { name: 'Segoe UI', size: 15, bold: true, color: { argb: valueArgb } };
+      valCell.alignment = { vertical: 'middle', horizontal: 'center' };
+
+      const subtextCell = sheet.getCell(5, startCol);
+      subtextCell.value = subtext;
+      subtextCell.font = { name: 'Segoe UI', size: 8.5, color: { argb: textArgb } };
+      subtextCell.alignment = { vertical: 'middle', horizontal: 'center' };
+
+      for (let r = 3; r <= 5; r++) {
+        for (let c = startCol; c <= endCol; c++) {
+          const cell = sheet.getCell(r, c);
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: fgColor } };
+          cell.border = {
+            top: r === 3 ? { style: 'thin', color: { argb: borderArgb } } : undefined,
+            bottom: r === 5 ? { style: 'thin', color: { argb: borderArgb } } : undefined,
+            left: c === startCol ? { style: 'thin', color: { argb: borderArgb } } : undefined,
+            right: c === endCol ? { style: 'thin', color: { argb: borderArgb } } : undefined,
+          };
+        }
+      }
     };
 
-    // Center header for No., OpenProject ID, Status, Severity, Due Date, Created / Sync Date, Completion Date
-    sheet.getCell('A1').alignment = { vertical: 'middle', horizontal: 'center' };
-    sheet.getCell('B1').alignment = { vertical: 'middle', horizontal: 'center' };
-    sheet.getCell('F1').alignment = { vertical: 'middle', horizontal: 'center' };
-    sheet.getCell('G1').alignment = { vertical: 'middle', horizontal: 'center' };
-    sheet.getCell('I1').alignment = { vertical: 'middle', horizontal: 'center' };
-    sheet.getCell('J1').alignment = { vertical: 'middle', horizontal: 'center' };
-    sheet.getCell('K1').alignment = { vertical: 'middle', horizontal: 'center' };
+    sheet.getRow(3).height = 16;
+    sheet.getRow(4).height = 28;
+    sheet.getRow(5).height = 16;
+
+    // 5 Styled Cards at the top of the Excel sheet!
+    createCard(1, 2, 'OVERALL PROGRESS', progressSummary, `${totalCount} Total Items`, 'FFECFDF5', 'FF10B981', 'FF047857', 'FF065F46');
+    createCard(3, 4, 'TO DO', todoCount, 'Pending Action', 'FFF0F9FF', 'FF38BDF8', 'FF0369A1', 'FF0284C7');
+    createCard(5, 6, 'IN PROGRESS', inProgressCount, 'Currently Active', 'FFFFFBEB', 'FFFBBF24', 'FFB45309', 'FFD97706');
+    createCard(7, 8, 'DELEGATED / WAITING', delegatedCount, 'QA & Review', 'FFEEF2FF', 'FF818CF8', 'FF4338CA', 'FF4F46E5');
+    createCard(9, 11, 'COMPLETED', completedCount, `${percentage}% Finished`, 'FFECFDF5', 'FF34D399', 'FF047857', 'FF059669');
+
+    // Row 6: Spacer row
+    sheet.getRow(6).height = 10;
+
+    // Row 7: Table Data Headers
+    const headers = [
+      'No.',
+      'OpenProject ID',
+      'Title',
+      'Description',
+      'Quadrant (Priority)',
+      'Status',
+      'Severity',
+      'Delegatee / QA',
+      'Due Date',
+      'Created / Sync Date',
+      'Completion Date',
+    ];
+
+    const headerRow = sheet.getRow(7);
+    headerRow.values = headers;
+    headerRow.height = 28;
+    headerRow.font = { name: 'Segoe UI', size: 10, bold: true, color: { argb: 'FFFFFFFF' } };
+    headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF312E81' } }; // Indigo-900
+    headerRow.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
+
+    sheet.getCell('A7').alignment = { vertical: 'middle', horizontal: 'center' };
+    sheet.getCell('B7').alignment = { vertical: 'middle', horizontal: 'center' };
+    sheet.getCell('F7').alignment = { vertical: 'middle', horizontal: 'center' };
+    sheet.getCell('G7').alignment = { vertical: 'middle', horizontal: 'center' };
+    sheet.getCell('I7').alignment = { vertical: 'middle', horizontal: 'center' };
+    sheet.getCell('J7').alignment = { vertical: 'middle', horizontal: 'center' };
+    sheet.getCell('K7').alignment = { vertical: 'middle', horizontal: 'center' };
 
     const getQuadrantStyle = (quadrant) => {
       switch (quadrant) {
@@ -489,19 +562,19 @@ router.post('/export-excel', async (req, res) => {
     };
 
     tasks.forEach((t, index) => {
-      const rowData = {
-        no: index + 1,
-        openproject_id: t.openproject_id ? `#${t.openproject_id}` : '-',
-        title: t.title || '',
-        description: t.description || '',
-        quadrant: QUADRANT_LABELS[t.quadrant] || t.quadrant,
-        status: STATUS_LABELS[t.status] || t.status,
-        severity: t.severity || '-',
-        delegatee: t.delegatee || 'None',
-        due_date: t.due_date ? String(t.due_date) : '-',
-        created_at: formatExcelDate(t.created_at),
-        completed_at: formatExcelDate(t.completed_at),
-      };
+      const rowData = [
+        index + 1,
+        t.openproject_id ? `#${t.openproject_id}` : '-',
+        t.title || '',
+        t.description || '',
+        QUADRANT_LABELS[t.quadrant] || t.quadrant,
+        STATUS_LABELS[t.status] || t.status,
+        t.severity || '-',
+        t.delegatee || 'None',
+        t.due_date ? String(t.due_date) : '-',
+        formatExcelDate(t.created_at),
+        formatExcelDate(t.completed_at),
+      ];
 
       const row = sheet.addRow(rowData);
       row.alignment = { vertical: 'top', wrapText: true };
@@ -589,22 +662,22 @@ router.post('/export-excel', async (req, res) => {
     });
 
     // Spacer row
-    sheet.addRow({});
+    sheet.addRow([]);
 
     // Summary Progress Row displaying percentage (e.g. 9/28 Done (32%))
-    const summaryRow = sheet.addRow({
-      no: '',
-      openproject_id: 'SUMMARY',
-      title: `Total: ${totalCount} Tasks (${completedCount} Completed, ${totalCount - completedCount} Pending)`,
-      description: '',
-      quadrant: '',
-      status: progressSummary,
-      severity: '',
-      delegatee: '',
-      due_date: '',
-      created_at: `Generated: ${new Date().toISOString().split('T')[0]}`,
-      completed_at: `${percentage}% Complete`,
-    });
+    const summaryRow = sheet.addRow([
+      '',
+      'SUMMARY',
+      `Total: ${totalCount} Tasks (${completedCount} Completed, ${totalCount - completedCount} Pending)`,
+      '',
+      '',
+      progressSummary,
+      '',
+      '',
+      '',
+      `Generated: ${new Date().toISOString().split('T')[0]}`,
+      `${percentage}% Complete`,
+    ]);
 
     summaryRow.height = 26;
     summaryRow.font = { name: 'Segoe UI', size: 10, bold: true, color: { argb: 'FF065F46' } }; // Emerald-800

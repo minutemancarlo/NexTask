@@ -64,7 +64,6 @@ export const ListView = () => {
   } = useTasks();
 
   const [todayOnly, setTodayOnly] = useState(false);
-  const [statusFilter, setStatusFilter] = useState('all'); // 'all' | 'todo' | 'in_progress' | 'delegated' | 'completed'
   const [sortBy, setSortBy] = useState('due_date'); // 'due_date' | 'quadrant' | 'title' | 'created_at'
   const [sortOrder, setSortOrder] = useState('asc'); // 'asc' | 'desc'
   const [currentPage, setCurrentPage] = useState(1);
@@ -86,29 +85,6 @@ export const ListView = () => {
     return todayEligibleTasks;
   }, [filteredTasks, todayOnly, todayEligibleTasks]);
 
-  // Dynamic status summary counts (automatically updates when todayOnly is toggled!)
-  const summaryCounts = useMemo(() => {
-    const counts = {
-      all: baseTasks.length,
-      todo: 0,
-      in_progress: 0,
-      delegated: 0,
-      completed: 0,
-    };
-    baseTasks.forEach((task) => {
-      if (counts[task.status] !== undefined) {
-        counts[task.status]++;
-      }
-    });
-    return counts;
-  }, [baseTasks]);
-
-  // Filter by status card if selected
-  const tasksAfterStatus = useMemo(() => {
-    if (statusFilter === 'all') return baseTasks;
-    return baseTasks.filter((task) => task.status === statusFilter);
-  }, [baseTasks, statusFilter]);
-
   const toggleSort = (field) => {
     if (sortBy === field) {
       setSortOrder(prev => (prev === 'asc' ? 'desc' : 'asc'));
@@ -119,7 +95,7 @@ export const ListView = () => {
   };
 
   const sortedTasks = useMemo(() => {
-    return [...tasksAfterStatus].sort((a, b) => {
+    return [...baseTasks].sort((a, b) => {
       let comp = 0;
       if (sortBy === 'quadrant') {
         comp = a.quadrant.localeCompare(b.quadrant);
@@ -136,7 +112,7 @@ export const ListView = () => {
       }
       return sortOrder === 'asc' ? comp : -comp;
     });
-  }, [tasksAfterStatus, sortBy, sortOrder]);
+  }, [baseTasks, sortBy, sortOrder]);
 
   // Adjust current page if out of bounds
   const totalPages = pageSize === 'all' ? 1 : Math.max(1, Math.ceil(sortedTasks.length / (Number(pageSize) || 25)));
@@ -189,200 +165,6 @@ export const ListView = () => {
 
   return (
     <div className="flex-1 px-3.5 sm:px-5 lg:px-6 py-4 w-full">
-      {/* Summary Count Dashboard */}
-      <div className="mb-4">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-3">
-          <div className="flex items-center gap-2.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-indigo-500 animate-pulse"></span>
-            <h2 className="text-base sm:text-lg font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
-              <span>Status Summary Dashboard</span>
-              {todayOnly && (
-                <span className="px-2.5 py-0.5 text-xs font-bold rounded-full bg-indigo-100 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
-                  Today's Filter Active
-                </span>
-              )}
-            </h2>
-          </div>
-
-          {/* Today Filter Checkbox */}
-          <label className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl border transition-all cursor-pointer select-none text-xs font-bold ${
-            todayOnly
-              ? 'bg-indigo-50 dark:bg-indigo-950/80 border-indigo-500 text-indigo-700 dark:text-indigo-300 shadow-xs ring-2 ring-indigo-500/20'
-              : 'bg-white/80 dark:bg-slate-900/80 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-700'
-          }`}>
-            <input
-              type="checkbox"
-              checked={todayOnly}
-              onChange={(e) => {
-                setTodayOnly(e.target.checked);
-                setCurrentPage(1);
-              }}
-              className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 cursor-pointer"
-            />
-            <Calendar className="w-3.5 h-3.5 text-indigo-500" />
-            <span>Synced/Created Today or Completed Today</span>
-            <span className={`px-2 py-0.5 rounded-md text-[11px] font-black ${
-              todayOnly
-                ? 'bg-indigo-600 text-white'
-                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
-            }`}>
-              {todayEligibleTasks.length}
-            </span>
-          </label>
-        </div>
-
-        {/* 4 Status Metric Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-          {/* To Do Card */}
-          <button
-            type="button"
-            onClick={() => {
-              setStatusFilter(prev => prev === 'todo' ? 'all' : 'todo');
-              setCurrentPage(1);
-            }}
-            className={`p-4 rounded-2xl border text-left transition-all cursor-pointer group relative overflow-hidden backdrop-blur-sm ${
-              statusFilter === 'todo'
-                ? 'bg-sky-50/90 dark:bg-sky-950/60 border-sky-500 ring-2 ring-sky-500/30 shadow-md'
-                : 'bg-white/80 dark:bg-slate-900/70 border-slate-200/90 dark:border-slate-800 hover:border-sky-300 dark:hover:border-sky-800 hover:shadow-xs'
-            }`}
-          >
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold uppercase tracking-wider text-sky-700 dark:text-sky-300">
-                To Do
-              </span>
-              <div className="w-8 h-8 rounded-xl bg-sky-100 dark:bg-sky-900/50 text-sky-600 dark:text-sky-400 flex items-center justify-center group-hover:scale-110 transition-transform">
-                <Clock className="w-4 h-4" />
-              </div>
-            </div>
-            <div className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white mb-0.5">
-              {summaryCounts.todo}
-            </div>
-            <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400 flex items-center justify-between">
-              <span>Pending action</span>
-              {statusFilter === 'todo' && (
-                <span className="text-sky-600 dark:text-sky-400 font-bold">Filtered</span>
-              )}
-            </div>
-          </button>
-
-          {/* In Progress Card */}
-          <button
-            type="button"
-            onClick={() => {
-              setStatusFilter(prev => prev === 'in_progress' ? 'all' : 'in_progress');
-              setCurrentPage(1);
-            }}
-            className={`p-4 rounded-2xl border text-left transition-all cursor-pointer group relative overflow-hidden backdrop-blur-sm ${
-              statusFilter === 'in_progress'
-                ? 'bg-amber-50/90 dark:bg-amber-950/60 border-amber-500 ring-2 ring-amber-500/30 shadow-md'
-                : 'bg-white/80 dark:bg-slate-900/70 border-slate-200/90 dark:border-slate-800 hover:border-amber-300 dark:hover:border-amber-800 hover:shadow-xs'
-            }`}
-          >
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold uppercase tracking-wider text-amber-700 dark:text-amber-300">
-                In Progress
-              </span>
-              <div className="w-8 h-8 rounded-xl bg-amber-100 dark:bg-amber-900/50 text-amber-600 dark:text-amber-400 flex items-center justify-center group-hover:scale-110 transition-transform">
-                <Flame className="w-4 h-4" />
-              </div>
-            </div>
-            <div className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white mb-0.5">
-              {summaryCounts.in_progress}
-            </div>
-            <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400 flex items-center justify-between">
-              <span>Active work</span>
-              {statusFilter === 'in_progress' && (
-                <span className="text-amber-600 dark:text-amber-400 font-bold">Filtered</span>
-              )}
-            </div>
-          </button>
-
-          {/* Delegated / Waiting Card */}
-          <button
-            type="button"
-            onClick={() => {
-              setStatusFilter(prev => prev === 'delegated' ? 'all' : 'delegated');
-              setCurrentPage(1);
-            }}
-            className={`p-4 rounded-2xl border text-left transition-all cursor-pointer group relative overflow-hidden backdrop-blur-sm ${
-              statusFilter === 'delegated'
-                ? 'bg-indigo-50/90 dark:bg-indigo-950/60 border-indigo-500 ring-2 ring-indigo-500/30 shadow-md'
-                : 'bg-white/80 dark:bg-slate-900/70 border-slate-200/90 dark:border-slate-800 hover:border-indigo-300 dark:hover:border-indigo-800 hover:shadow-xs'
-            }`}
-          >
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-300">
-                Delegated / Waiting
-              </span>
-              <div className="w-8 h-8 rounded-xl bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center group-hover:scale-110 transition-transform">
-                <UserCheck className="w-4 h-4" />
-              </div>
-            </div>
-            <div className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white mb-0.5">
-              {summaryCounts.delegated}
-            </div>
-            <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400 flex items-center justify-between">
-              <span>QA / external review</span>
-              {statusFilter === 'delegated' && (
-                <span className="text-indigo-600 dark:text-indigo-400 font-bold">Filtered</span>
-              )}
-            </div>
-          </button>
-
-          {/* Completed Card */}
-          <button
-            type="button"
-            onClick={() => {
-              setStatusFilter(prev => prev === 'completed' ? 'all' : 'completed');
-              setCurrentPage(1);
-            }}
-            className={`p-4 rounded-2xl border text-left transition-all cursor-pointer group relative overflow-hidden backdrop-blur-sm ${
-              statusFilter === 'completed'
-                ? 'bg-emerald-50/90 dark:bg-emerald-950/60 border-emerald-500 ring-2 ring-emerald-500/30 shadow-md'
-                : 'bg-white/80 dark:bg-slate-900/70 border-slate-200/90 dark:border-slate-800 hover:border-emerald-300 dark:hover:border-emerald-800 hover:shadow-xs'
-            }`}
-          >
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
-                Completed
-              </span>
-              <div className="w-8 h-8 rounded-xl bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center group-hover:scale-110 transition-transform">
-                <CheckCircle2 className="w-4 h-4" />
-              </div>
-            </div>
-            <div className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white mb-0.5">
-              {summaryCounts.completed}
-            </div>
-            <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400 flex items-center justify-between">
-              <span>Finished tasks</span>
-              {statusFilter === 'completed' && (
-                <span className="text-emerald-600 dark:text-emerald-400 font-bold">Filtered</span>
-              )}
-            </div>
-          </button>
-        </div>
-
-        {/* Filter Pill if statusFilter is active */}
-        {statusFilter !== 'all' && (
-          <div className="flex items-center gap-2 mt-2.5 px-1">
-            <span className="text-xs text-slate-500 dark:text-slate-400">Filtered by status:</span>
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
-              <span className="capitalize">{statusFilter.replace('_', ' ')}</span>
-              <button
-                onClick={() => {
-                  setStatusFilter('all');
-                  setCurrentPage(1);
-                }}
-                className="hover:text-rose-500 cursor-pointer ml-1 font-bold text-sm"
-                title="Clear status filter"
-              >
-                ×
-              </button>
-            </span>
-          </div>
-        )}
-      </div>
-
       <div className="bg-white/80 dark:bg-slate-900/70 rounded-2xl border border-slate-200/90 dark:border-slate-800 backdrop-blur-sm shadow-xs overflow-hidden">
         
         {/* Table Header Controls */}
@@ -390,25 +172,49 @@ export const ListView = () => {
         <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 bg-gradient-to-r from-indigo-500/10 via-purple-500/5 to-transparent dark:from-indigo-950/40 dark:to-slate-900/40">
           <div className="flex items-center gap-2.5">
             <span className="w-3.5 h-3.5 rounded-full bg-indigo-600 ring-4 ring-indigo-500/20 shadow-xs shadow-indigo-500/50 shrink-0" />
-            <h3 className="text-base font-extrabold text-slate-900 dark:text-white tracking-tight">
-              {statusFilter !== 'all' ? (
-                <>
-                  <span className="capitalize">{statusFilter.replace('_', ' ')} Tasks</span>
-                  <span className="text-slate-400 font-normal ml-1">({sortedTasks.length})</span>
-                </>
-              ) : (
-                <>All Tasks ({sortedTasks.length})</>
+            <h3 className="text-base font-extrabold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
+              <span>All Tasks ({sortedTasks.length})</span>
+              {todayOnly && (
+                <span className="px-2 py-0.5 text-[11px] font-bold rounded-full bg-indigo-100 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                  Today's Activity Active
+                </span>
               )}
             </h3>
           </div>
 
           <div className="flex items-center gap-2.5 flex-wrap w-full md:w-auto justify-start md:justify-end text-xs sm:text-sm">
+            {/* Today Filter Checkbox */}
+            <label className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border transition-all cursor-pointer select-none text-xs font-bold ${
+              todayOnly
+                ? 'bg-indigo-50 dark:bg-indigo-950/80 border-indigo-500 text-indigo-700 dark:text-indigo-300 shadow-xs ring-2 ring-indigo-500/20'
+                : 'bg-white dark:bg-slate-800/80 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600'
+            }`}>
+              <input
+                type="checkbox"
+                checked={todayOnly}
+                onChange={(e) => {
+                  setTodayOnly(e.target.checked);
+                  setCurrentPage(1);
+                }}
+                className="w-3.5 h-3.5 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 cursor-pointer"
+              />
+              <Calendar className="w-3.5 h-3.5 text-indigo-500" />
+              <span>Synced / Completed Today</span>
+              <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-black ${
+                todayOnly
+                  ? 'bg-indigo-600 text-white'
+                  : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400'
+              }`}>
+                {todayEligibleTasks.length}
+              </span>
+            </label>
+
             {/* Excel Export Button */}
             <button
               onClick={handleExportExcel}
               disabled={isExporting || sortedTasks.length === 0}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-xs transition-all cursor-pointer disabled:opacity-50 text-xs"
-              title="Download formatted Excel (.xlsx) report with Created/Sync and Completion Dates"
+              title="Download formatted Excel (.xlsx) report with Cards Dashboard, Created/Sync and Completion Dates"
             >
               {isExporting ? (
                 <>
