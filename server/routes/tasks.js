@@ -661,6 +661,13 @@ router.post('/export-excel', async (req, res) => {
       });
     });
 
+    // Enable Excel filtering dropdowns on table header columns (Row 7, Columns A to K)
+    const lastRowIndex = Math.max(7, 7 + tasks.length);
+    sheet.autoFilter = {
+      from: 'A7',
+      to: `K${lastRowIndex}`,
+    };
+
     const filename = `nextask-tasks-report-${new Date().toISOString().split('T')[0]}.xlsx`;
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
