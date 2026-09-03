@@ -45,10 +45,9 @@ const formatShortDateTime = (dStr) => {
   const d = parseDate(dStr);
   if (!d) return null;
   return d.toLocaleDateString(undefined, {
+    year: 'numeric',
     month: 'short',
     day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
   });
 };
 
