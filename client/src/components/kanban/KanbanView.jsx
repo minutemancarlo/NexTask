@@ -121,7 +121,7 @@ export const KanbanView = () => {
                   </div>
                 ) : (
                   colTasks.map((task) => (
-                    <TaskCard key={task.id} task={task} isCompact={true} />
+                    <TaskCard key={task.id} task={task} isCompact={false} />
                   ))
                 )}
               </div>

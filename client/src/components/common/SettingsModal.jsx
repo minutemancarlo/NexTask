@@ -16,7 +16,6 @@ import {
   Eye,
   EyeOff,
   ExternalLink,
-  FolderGit2,
   Volume2,
   BellRing,
   Radio,
@@ -42,6 +41,8 @@ export const SettingsModal = () => {
     refreshData,
     testDingDongChime,
     simulateSampleNewTicket,
+    simulateSampleAssigneeChange,
+    simulateSampleServerDown,
     confirmAction,
     resetMonitoringHistory,
   } = useTasks();
@@ -70,6 +71,9 @@ export const SettingsModal = () => {
   );
   const [opMonitorBrowserNotification, setOpMonitorBrowserNotification] = useState(
     settings.openproject?.monitorBrowserNotification !== false
+  );
+  const [opMonitorAssigneeChange, setOpMonitorAssigneeChange] = useState(
+    settings.openproject?.monitorAssigneeChange !== false
   );
   const [opMonitorAutoSync, setOpMonitorAutoSync] = useState(
     settings.openproject?.monitorAutoSync || false
@@ -104,7 +108,6 @@ export const SettingsModal = () => {
   const [statusesLoading, setStatusesLoading] = useState(false);
   const [syncLoading, setSyncLoading] = useState(false);
   const [syncResult, setSyncResult] = useState(null);
-  const [tagImportStatus, setTagImportStatus] = useState('');
 
   // Allowed Accessible Projects Multi-Select State
   const [allowedOpProjectIds, setAllowedOpProjectIds] = useState(
@@ -144,6 +147,7 @@ export const SettingsModal = () => {
       setOpMonitorInterval(settings.openproject.monitorInterval || 60);
       setOpMonitorSound(settings.openproject.monitorSound !== false);
       setOpMonitorBrowserNotification(settings.openproject.monitorBrowserNotification !== false);
+      setOpMonitorAssigneeChange(settings.openproject.monitorAssigneeChange !== false);
       setOpMonitorAutoSync(settings.openproject.monitorAutoSync || false);
     }
   }, [settings.openproject]);
@@ -183,6 +187,7 @@ export const SettingsModal = () => {
         monitorInterval: parseInt(opMonitorInterval, 10) || 60,
         monitorSound: opMonitorSound,
         monitorBrowserNotification: opMonitorBrowserNotification,
+        monitorAssigneeChange: opMonitorAssigneeChange,
         monitorAutoSync: opMonitorAutoSync,
       }
     };
@@ -265,19 +270,6 @@ export const SettingsModal = () => {
     }
   };
 
-  const handleImportProjectsAsTags = async () => {
-    if (opProjects.length === 0) return;
-    try {
-      setTagImportStatus('Importing tags...');
-      const res = await api.importOpenProjectProjects(opProjects);
-      await refreshData();
-      setTagImportStatus(`Imported ${res.count} project tags!`);
-      setTimeout(() => setTagImportStatus(''), 3000);
-    } catch (err) {
-      setTagImportStatus('Import failed: ' + err.message);
-    }
-  };
-
   const handleSyncTickets = async () => {
     setSyncLoading(true);
     setSyncResult(null);
@@ -324,7 +316,7 @@ export const SettingsModal = () => {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `clariti-backup-${new Date().toISOString().split('T')[0]}.json`;
+      a.download = `nextask-backup-${new Date().toISOString().split('T')[0]}.json`;
       a.click();
       URL.revokeObjectURL(url);
       setExportStatus('Exported successfully!');
@@ -362,7 +354,7 @@ export const SettingsModal = () => {
           <div className="flex items-center gap-2.5">
             <Sliders className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
             <h3 className="text-lg font-bold text-slate-900 dark:text-white">
-              Clariti Configuration & Settings
+              NexTask Configuration & Settings
             </h3>
           </div>
           <button
@@ -535,7 +527,7 @@ export const SettingsModal = () => {
                   projects={opProjects}
                 />
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                  Restrict Clariti to only query work packages from these chosen projects. When none are selected, all accessible projects will be queried.
+                  Restrict NexTask to only query work packages from these chosen projects. When none are selected, all accessible projects will be queried.
                 </p>
               </div>
 
@@ -684,24 +676,7 @@ export const SettingsModal = () => {
                   <RefreshCw className={`w-4 h-4 ${syncLoading ? 'animate-spin' : ''}`} />
                   {syncLoading ? 'Syncing Tickets...' : 'Sync Tickets Now'}
                 </button>
-
-                {opProjects.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={handleImportProjectsAsTags}
-                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 text-sm font-semibold transition-all cursor-pointer"
-                  >
-                    <FolderGit2 className="w-4 h-4 text-indigo-500" />
-                    Import Projects as Tags ({opProjects.length})
-                  </button>
-                )}
               </div>
-
-              {tagImportStatus && (
-                <p className="text-xs font-semibold text-indigo-600 dark:text-indigo-400">
-                  {tagImportStatus}
-                </p>
-              )}
 
               {syncResult && (
                 <div className={`p-2.5 rounded-xl text-xs font-semibold flex items-center gap-2 ${
@@ -745,113 +720,169 @@ export const SettingsModal = () => {
                 </div>
 
                 {opMonitorEnabled && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-2 pl-10">
-                    {/* Polling Interval */}
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                        Polling Frequency
-                      </label>
-                      <select
-                        value={opMonitorInterval}
-                        onChange={(e) => setOpMonitorInterval(Number(e.target.value))}
-                        className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-indigo-500/20"
+                  <div className="space-y-3.5 pt-2 pl-10">
+                    
+                    {/* Live Monitor Simulation & Sound Test Toolbar */}
+                    <div className="flex items-center gap-2 flex-wrap p-2 rounded-xl bg-indigo-50/60 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900/40">
+                      <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 mr-1">
+                        Quick Simulation Tools:
+                      </span>
+                      <button
+                        type="button"
+                        onClick={testDingDongChime}
+                        className="px-2.5 py-1 text-[11px] font-bold bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-slate-700 rounded-lg border border-slate-200 dark:border-slate-700 transition-colors flex items-center gap-1 cursor-pointer"
+                        title="Test the Web Audio doorbell chime"
                       >
-                        <option value={30}>Every 30 Seconds (Fast)</option>
-                        <option value={60}>Every 1 Minute (Recommended)</option>
-                        <option value={120}>Every 2 Minutes</option>
-                        <option value={300}>Every 5 Minutes (Low traffic)</option>
-                      </select>
+                        🔔 Sound Test
+                      </button>
+                      <button
+                        type="button"
+                        onClick={simulateSampleNewTicket}
+                        className="px-2.5 py-1 text-[11px] font-bold bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-slate-700 rounded-lg border border-slate-200 dark:border-slate-700 transition-colors flex items-center gap-1 cursor-pointer"
+                        title="Simulate arrival of a brand new ticket"
+                      >
+                        ✨ Simulate New Ticket
+                      </button>
+                      <button
+                        type="button"
+                        onClick={simulateSampleAssigneeChange}
+                        className="px-2.5 py-1 text-[11px] font-bold bg-white dark:bg-slate-800 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-slate-700 rounded-lg border border-slate-200 dark:border-slate-700 transition-colors flex items-center gap-1 cursor-pointer"
+                        title="Simulate a ticket assigned to you being reassigned to someone else"
+                      >
+                        🎭 Simulate Reassigned
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => simulateSampleServerDown(1)}
+                        className="px-2.5 py-1 text-[11px] font-bold bg-white dark:bg-slate-800 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-slate-700 rounded-lg border border-slate-200 dark:border-slate-700 transition-colors flex items-center gap-1 cursor-pointer"
+                        title="Simulate 1st OpenProject connection failure alert"
+                      >
+                        🚨 Simulate Server Down (1st)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => simulateSampleServerDown(3)}
+                        className="px-2.5 py-1 text-[11px] font-bold bg-white dark:bg-slate-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-slate-700 rounded-lg border border-slate-200 dark:border-slate-700 transition-colors flex items-center gap-1 cursor-pointer"
+                        title="Simulate OpenProject unreachable after 3 consecutive failed retries"
+                      >
+                        ⚠️ Simulate 3 Retries Failed
+                      </button>
+                      <button
+                        type="button"
+                        onClick={resetMonitoringHistory}
+                        className="px-2.5 py-1 text-[11px] font-bold bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg border border-slate-200 dark:border-slate-700 transition-colors flex items-center gap-1 cursor-pointer"
+                        title="Reset notification memory so unsynced and reassigned tickets can be captured afresh"
+                      >
+                        🔄 Reset Memory
+                      </button>
                     </div>
 
-                    {/* Sound Settings & Chime Tester */}
-                    <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                      {/* Polling Interval */}
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                          Polling Frequency
+                        </label>
+                        <select
+                          value={opMonitorInterval}
+                          onChange={(e) => setOpMonitorInterval(Number(e.target.value))}
+                          className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-indigo-500/20"
+                        >
+                          <option value={30}>Every 30 Seconds (Fast)</option>
+                          <option value={60}>Every 1 Minute (Recommended)</option>
+                          <option value={120}>Every 2 Minutes</option>
+                          <option value={300}>Every 5 Minutes (Low traffic)</option>
+                        </select>
+                      </div>
+
+                      {/* Sound Chime Toggle */}
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1.5">
                           <Volume2 className="w-3.5 h-3.5 text-indigo-500" />
                           Ding-Dong Chime
                         </label>
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={testDingDongChime}
-                            className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 cursor-pointer"
-                            title="Test the Web Audio doorbell chime"
-                          >
-                            🔔 Play Sound Test
-                          </button>
-                          <span className="text-slate-300 dark:text-slate-600">|</span>
-                          <button
-                            type="button"
-                            onClick={resetMonitoringHistory}
-                            className="text-[11px] font-bold text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-1 cursor-pointer"
-                            title="Reset notification memory so unsynced tickets are captured again"
-                          >
-                            🔄 Reset Monitor Memory
-                          </button>
-                        </div>
-                      </div>
-                      <label className="flex items-center gap-2.5 p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={opMonitorSound}
-                          onChange={(e) => setOpMonitorSound(e.target.checked)}
-                          className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500"
-                        />
-                        <span className="text-xs text-slate-700 dark:text-slate-300 font-medium">
-                          Play harmonic chime on new ticket
-                        </span>
-                      </label>
-                    </div>
-
-                    {/* Browser Notifications */}
-                    <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                          <BellRing className="w-3.5 h-3.5 text-indigo-500" />
-                          Desktop Notifications
+                        <label className="flex items-center gap-2.5 p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={opMonitorSound}
+                            onChange={(e) => setOpMonitorSound(e.target.checked)}
+                            className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500"
+                          />
+                          <span className="text-xs text-slate-700 dark:text-slate-300 font-medium">
+                            Play harmonic chime on alerts
+                          </span>
                         </label>
-                        {notificationPermissionState !== 'granted' && (
-                          <button
-                            type="button"
-                            onClick={async () => {
-                              const perm = await requestNotificationPermission();
-                              setNotificationPermissionState(perm);
-                            }}
-                            className="text-[11px] font-bold text-amber-600 dark:text-amber-400 hover:underline cursor-pointer"
-                          >
-                            Grant Permission
-                          </button>
-                        )}
                       </div>
-                      <label className="flex items-center gap-2.5 p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={opMonitorBrowserNotification}
-                          onChange={(e) => setOpMonitorBrowserNotification(e.target.checked)}
-                          className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500"
-                        />
-                        <span className="text-xs text-slate-700 dark:text-slate-300 font-medium">
-                          Show native desktop popups
-                        </span>
-                      </label>
-                    </div>
 
-                    {/* Auto Sync Toggle */}
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                        Automatic Matrix Sync
-                      </label>
-                      <label className="flex items-center gap-2.5 p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={opMonitorAutoSync}
-                          onChange={(e) => setOpMonitorAutoSync(e.target.checked)}
-                          className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500"
-                        />
-                        <span className="text-xs text-slate-700 dark:text-slate-300 font-medium">
-                          Auto-add to Matrix without prompt
-                        </span>
-                      </label>
+                      {/* Browser Notifications */}
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                            <BellRing className="w-3.5 h-3.5 text-indigo-500" />
+                            Desktop Notifications
+                          </label>
+                          {notificationPermissionState !== 'granted' && (
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                const perm = await requestNotificationPermission();
+                                setNotificationPermissionState(perm);
+                              }}
+                              className="text-[11px] font-bold text-amber-600 dark:text-amber-400 hover:underline cursor-pointer"
+                            >
+                              Grant Permission
+                            </button>
+                          )}
+                        </div>
+                        <label className="flex items-center gap-2.5 p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={opMonitorBrowserNotification}
+                            onChange={(e) => setOpMonitorBrowserNotification(e.target.checked)}
+                            className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500"
+                          />
+                          <span className="text-xs text-slate-700 dark:text-slate-300 font-medium">
+                            Show native desktop popups
+                          </span>
+                        </label>
+                      </div>
+
+                      {/* Notify on Assignee Change Toggle */}
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1.5">
+                          <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                          Assignee Change Alerts
+                        </label>
+                        <label className="flex items-center gap-2.5 p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={opMonitorAssigneeChange}
+                            onChange={(e) => setOpMonitorAssigneeChange(e.target.checked)}
+                            className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500"
+                          />
+                          <span className="text-xs text-slate-700 dark:text-slate-300 font-medium">
+                            Notify if my ticket is reassigned
+                          </span>
+                        </label>
+                      </div>
+
+                      {/* Auto Sync Toggle */}
+                      <div className="sm:col-span-2">
+                        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                          Automatic Matrix Sync (New Tickets)
+                        </label>
+                        <label className="flex items-center gap-2.5 p-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={opMonitorAutoSync}
+                            onChange={(e) => setOpMonitorAutoSync(e.target.checked)}
+                            className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500"
+                          />
+                          <span className="text-xs text-slate-700 dark:text-slate-300 font-medium">
+                            Auto-add newly submitted tickets to Matrix without prompt
+                          </span>
+                        </label>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -1054,7 +1085,7 @@ export const SettingsModal = () => {
                           setPurgeLoading(true);
                           setPurgeMessage(null);
                           await purgeAllTasks();
-                          setPurgeMessage('Clariti tasks purged successfully. Configs preserved.');
+                          setPurgeMessage('NexTask tasks purged successfully. Configs preserved.');
                           setIsPurgeConfirming(false);
                           setTimeout(() => setPurgeMessage(null), 5000);
                         } catch (err) {

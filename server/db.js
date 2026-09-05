@@ -72,6 +72,14 @@ try {
   if (!columnNames.includes('severity')) {
     db.exec(`ALTER TABLE tasks ADD COLUMN severity TEXT;`);
   }
+
+  if (!columnNames.includes('openproject_assignee')) {
+    db.exec(`ALTER TABLE tasks ADD COLUMN openproject_assignee TEXT;`);
+  }
+
+  if (!columnNames.includes('openproject_assignee_id')) {
+    db.exec(`ALTER TABLE tasks ADD COLUMN openproject_assignee_id TEXT;`);
+  }
 } catch (migErr) {
   console.error('Migration error for openproject columns:', migErr);
 }

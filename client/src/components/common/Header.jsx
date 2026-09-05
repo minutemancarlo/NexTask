@@ -29,6 +29,8 @@ export const Header = () => {
     isFetchingCandidates,
     tasks,
     isMonitoringActive,
+    serverDownAlert,
+    totalAlertCount,
     activeNewTicketAlert,
     simulateSampleNewTicket,
   } = useTasks();
@@ -141,17 +143,27 @@ export const Header = () => {
           {isMonitoringActive && (
             <button
               onClick={() => setIsSettingsOpen(true)}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-indigo-50/80 dark:bg-indigo-950/50 border border-indigo-200/80 dark:border-indigo-800/50 text-indigo-700 dark:text-indigo-300 text-xs font-semibold hover:border-indigo-400 transition-all cursor-pointer shadow-2xs"
-              title={`Live Monitor: Checking OpenProject every ${settings.openproject?.monitorInterval || 60}s for Status = New`}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer shadow-2xs ${
+                serverDownAlert
+                  ? 'bg-rose-50/90 dark:bg-rose-950/60 border-rose-300 dark:border-rose-800 text-rose-700 dark:text-rose-300 hover:border-rose-400'
+                  : 'bg-indigo-50/80 dark:bg-indigo-950/50 border-indigo-200/80 dark:border-indigo-800/50 text-indigo-700 dark:text-indigo-300 hover:border-indigo-400'
+              }`}
+              title={
+                serverDownAlert
+                  ? `OpenProject Connection Alert: ${serverDownAlert.message} (Failed attempts: ${serverDownAlert.failureCount})`
+                  : `Live Monitor: Checking OpenProject every ${settings.openproject?.monitorInterval || 60}s`
+              }
             >
               <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${serverDownAlert ? 'bg-rose-400' : 'bg-emerald-400'}`}></span>
+                <span className={`relative inline-flex rounded-full h-2 w-2 ${serverDownAlert ? 'bg-rose-500' : 'bg-emerald-500'}`}></span>
               </span>
-              <span className="hidden sm:inline">Live Monitor</span>
-              {activeNewTicketAlert && (
+              <span className="hidden sm:inline">
+                {serverDownAlert ? (serverDownAlert.failureCount >= 3 ? 'Server Unreachable' : 'Server Down') : 'Live Monitor'}
+              </span>
+              {totalAlertCount > 0 && (
                 <span className="flex items-center justify-center px-1.5 py-0.2 rounded-full bg-rose-500 text-white text-[10px] font-bold animate-pulse">
-                  {activeNewTicketAlert.count}
+                  {totalAlertCount}
                 </span>
               )}
             </button>

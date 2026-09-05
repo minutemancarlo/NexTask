@@ -230,14 +230,48 @@ export const api = {
       body: JSON.stringify(filters),
     });
     if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.error || 'Failed to generate report');
+      let errMsg = 'Failed to generate OpenProject report';
+      try {
+        const err = await res.json();
+        errMsg = err.error || errMsg;
+      } catch {
+        const text = await res.text().catch(() => '');
+        errMsg = text.slice(0, 150) || `Server error (${res.status})`;
+      }
+      throw new Error(errMsg);
     }
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     a.download = `openproject-report-${new Date().toISOString().split('T')[0]}.xlsx`;
+    a.click();
+    URL.revokeObjectURL(url);
+    return true;
+  },
+
+  async exportTasksExcelReport(filters = {}) {
+    const res = await fetch(`${API_BASE}/tasks/export-excel`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(filters),
+    });
+    if (!res.ok) {
+      let errMsg = 'Failed to generate Tasks Excel report';
+      try {
+        const err = await res.json();
+        errMsg = err.error || errMsg;
+      } catch {
+        const text = await res.text().catch(() => '');
+        errMsg = text.slice(0, 150) || `Server error (${res.status})`;
+      }
+      throw new Error(errMsg);
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `nextask-tasks-report-${new Date().toISOString().split('T')[0]}.xlsx`;
     a.click();
     URL.revokeObjectURL(url);
     return true;

@@ -52,3 +52,81 @@ export function showTicketNotification(ticket, onClickAction) {
     return null;
   }
 }
+
+export function showAssigneeChangeNotification(ticket, onClickAction) {
+  if (!('Notification' in window) || Notification.permission !== 'granted') {
+    return null;
+  }
+
+  const title = `NexTask • Ticket #${ticket.opId} Reassigned`;
+  const previous = ticket.previousAssignee || 'You';
+  const next = ticket.newAssignee || 'Unassigned';
+  const body = `${ticket.subject}\nReassigned: ${previous} ➔ ${next}\nProject: ${ticket.projectName || 'General'}`;
+
+  const iconUrl = new URL('/favicon.svg', window.location.origin).href;
+
+  try {
+    const notification = new Notification(title, {
+      body,
+      icon: iconUrl,
+      badge: iconUrl,
+      tag: `nextask-reassign-${ticket.opId}-${next}`,
+      renotify: true,
+      requireInteraction: false,
+    });
+
+    notification.onclick = () => {
+      window.focus();
+      if (typeof onClickAction === 'function') {
+        onClickAction();
+      }
+      notification.close();
+    };
+
+    return notification;
+  } catch (e) {
+    console.warn('Failed to display reassignment notification:', e);
+    return null;
+  }
+}
+
+export function showServerDownNotification(failureCount, errorMessage, onClickAction) {
+  if (!('Notification' in window) || Notification.permission !== 'granted') {
+    return null;
+  }
+
+  const isThirdRetry = failureCount >= 3;
+  const title = isThirdRetry
+    ? `NexTask • OpenProject Unreachable (3 Retries Failed)`
+    : `NexTask • OpenProject Server Down`;
+
+  const body = isThirdRetry
+    ? `Cannot reach OpenProject after 3 retries. Please check host URL, network connection, or VPN.\nError: ${errorMessage || 'Unreachable'}`
+    : `Connection to OpenProject failed. Retrying in background...\nError: ${errorMessage || 'Connection failed'}`;
+
+  const iconUrl = new URL('/favicon.svg', window.location.origin).href;
+
+  try {
+    const notification = new Notification(title, {
+      body,
+      icon: iconUrl,
+      badge: iconUrl,
+      tag: `nextask-server-down-${isThirdRetry ? 'persistent' : 'initial'}`,
+      renotify: true,
+      requireInteraction: isThirdRetry,
+    });
+
+    notification.onclick = () => {
+      window.focus();
+      if (typeof onClickAction === 'function') {
+        onClickAction();
+      }
+      notification.close();
+    };
+
+    return notification;
+  } catch (e) {
+    console.warn('Failed to display server down notification:', e);
+    return null;
+  }
+}

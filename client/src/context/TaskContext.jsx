@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '../services/api';
 import { playDingDongSound } from '../utils/sound';
-import { showTicketNotification } from '../utils/notification';
+import { showTicketNotification, showAssigneeChangeNotification, showServerDownNotification } from '../utils/notification';
 
 const TaskContext = createContext();
 
@@ -9,7 +9,7 @@ export const TaskProvider = ({ children }) => {
   const [tasks, setTasks] = useState([]);
   const [categories, setCategories] = useState([]);
   const [settings, setSettings] = useState(() => {
-    const savedTheme = localStorage.getItem('clariti_theme');
+    const savedTheme = localStorage.getItem('nextask_theme');
     return {
       theme: savedTheme || 'dark',
       pomodoro_work: 25,
@@ -42,16 +42,35 @@ export const TaskProvider = ({ children }) => {
 
   // Real-Time / Periodic New Ticket Monitoring Queue State (Multiple notifications support)
   const [activeNewTicketAlerts, setActiveNewTicketAlerts] = useState([]);
+  const [activeAssigneeAlerts, setActiveAssigneeAlerts] = useState([]);
+  const [serverDownAlert, setServerDownAlert] = useState(null); // { failureCount, message, isPersistent, timestamp }
+  const consecutiveFailuresRef = useRef(0);
   const [isMonitoringActive, setIsMonitoringActive] = useState(false);
   const [lastMonitoredAt, setLastMonitoredAt] = useState(null);
-  // Session-based tracking so unsynced new tickets are automatically captured on app start
-  const [notifiedTicketIds, setNotifiedTicketIds] = useState(new Set());
+  // Session-based tracking so unsynced new tickets and reassignments are captured without repeat spam
+  const [notifiedTicketIds, setNotifiedTicketIds] = useState(() => {
+    try {
+      const saved = localStorage.getItem('nextask_notified_tickets');
+      return saved ? new Set(JSON.parse(saved)) : new Set();
+    } catch (e) {
+      return new Set();
+    }
+  });
+  const [notifiedReassignmentKeys, setNotifiedReassignmentKeys] = useState(() => {
+    try {
+      const saved = localStorage.getItem('nextask_notified_reassignments');
+      return saved ? new Set(JSON.parse(saved)) : new Set();
+    } catch (e) {
+      return new Set();
+    }
+  });
 
   // Filters & Views
   const [activeView, setActiveView] = useState('matrix'); // 'matrix' | 'kanban' | 'list' | 'openproject'
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedQuadrantFilter, setSelectedQuadrantFilter] = useState('');
+  const [selectedSourceFilter, setSelectedSourceFilter] = useState(''); // '' | 'user' | 'openproject'
 
   // Modals & Active Task
   const [editingTask, setEditingTask] = useState(null); // null, 'new', or task object
@@ -75,7 +94,7 @@ export const TaskProvider = ({ children }) => {
     } else {
       root.classList.remove('dark');
     }
-    localStorage.setItem('clariti_theme', settings.theme);
+    localStorage.setItem('nextask_theme', settings.theme);
   }, [settings.theme]);
 
   // Fetch initial data
@@ -244,10 +263,42 @@ export const TaskProvider = ({ children }) => {
   // Reset monitoring notification memory
   const resetMonitoringHistory = () => {
     setNotifiedTicketIds(new Set());
+    setNotifiedReassignmentKeys(new Set());
     setActiveNewTicketAlerts([]);
+    setActiveAssigneeAlerts([]);
+    setServerDownAlert(null);
+    consecutiveFailuresRef.current = 0;
     try {
       localStorage.removeItem('nextask_notified_tickets');
+      localStorage.removeItem('nextask_notified_reassignments');
     } catch (e) {}
+  };
+
+  const dismissServerDownAlert = () => {
+    setServerDownAlert(null);
+  };
+
+  // Simulate a Server Down event (failureCount: 1 = First detection, 3 = 3rd Retry Unreachable)
+  const simulateSampleServerDown = (failureCount = 1) => {
+    const errorMsg = failureCount >= 3
+      ? 'HTTP 503 Gateway Timeout: OpenProject server unreachable after 3 retries'
+      : 'HTTP 502 Bad Gateway: Unable to establish connection to OpenProject host';
+
+    // Play Ding-Dong chime sound
+    playDingDongSound();
+
+    // Trigger desktop notification
+    showServerDownNotification(failureCount, errorMsg, () => {
+      setIsSettingsOpen(true);
+    });
+
+    // Set active server down alert
+    setServerDownAlert({
+      failureCount,
+      message: errorMsg,
+      isPersistent: failureCount >= 3,
+      timestamp: new Date().toISOString(),
+    });
   };
 
   // Danger Zone Purge
@@ -316,6 +367,56 @@ export const TaskProvider = ({ children }) => {
     }
   };
 
+  const dismissAssigneeAlert = (opId) => {
+    if (!opId) {
+      setActiveAssigneeAlerts([]); // Dismiss all
+    } else {
+      setActiveAssigneeAlerts(prev => prev.filter(t => t.opId !== opId));
+    }
+  };
+
+  const keepReassignedTask = async (taskId, opId, newAssignee, newAssigneeId) => {
+    try {
+      if (taskId) {
+        await updateTask(taskId, {
+          openproject_assignee: newAssignee || 'Other Assignee',
+          openproject_assignee_id: newAssigneeId || null,
+        });
+      }
+      dismissAssigneeAlert(opId);
+    } catch (e) {
+      console.error('Failed to keep reassigned task:', e);
+    }
+  };
+
+  const delegateReassignedTask = async (taskId, opId, newAssignee, newAssigneeId) => {
+    try {
+      if (taskId) {
+        await updateTask(taskId, {
+          quadrant: 'Q3',
+          status: 'delegated',
+          delegatee: newAssignee || 'Other Assignee',
+          openproject_assignee: newAssignee || 'Other Assignee',
+          openproject_assignee_id: newAssigneeId || null,
+        });
+      }
+      dismissAssigneeAlert(opId);
+    } catch (e) {
+      console.error('Failed to delegate reassigned task:', e);
+    }
+  };
+
+  const removeReassignedTask = async (taskId, opId) => {
+    try {
+      if (taskId) {
+        await deleteTask(taskId);
+      }
+      dismissAssigneeAlert(opId);
+    } catch (e) {
+      console.error('Failed to remove reassigned task:', e);
+    }
+  };
+
   const testDingDongChime = () => {
     playDingDongSound();
   };
@@ -373,7 +474,47 @@ export const TaskProvider = ({ children }) => {
     });
   };
 
-  // Periodic Monitor for OpenProject New Tickets
+  // Simulate an Assignee Change event (accumulates in activeAssigneeAlerts queue)
+  const simulateSampleAssigneeChange = () => {
+    // Pick an existing OpenProject task or generate realistic sample
+    const existingOpTask = tasks.find(t => t.openproject_id);
+    const sampleId = existingOpTask ? Number(existingOpTask.openproject_id) : Math.floor(50400 + Math.random() * 200);
+    const sampleSubject = existingOpTask ? existingOpTask.title : 'Payment Gateway Double-Submit Reconciliation Handler';
+    const sampleTaskId = existingOpTask ? existingOpTask.id : null;
+    const sampleProject = existingOpTask?.category_name || 'Axis Core Banking';
+
+    const assignees = ['Sarah Jenkins', 'Elena Rostova (Lead QA)', 'David Miller (DevOps)', 'Alexander Wright'];
+    const randomNewAssignee = assignees[Math.floor(Math.random() * assignees.length)];
+
+    const reassignmentItem = {
+      taskId: sampleTaskId,
+      opId: sampleId,
+      subject: sampleSubject,
+      formattedTitle: `#${sampleId} - ${sampleSubject}`,
+      previousAssignee: existingOpTask?.openproject_assignee || 'You (Assigned User)',
+      newAssignee: randomNewAssignee,
+      newAssigneeId: String(Math.floor(2 + Math.random() * 10)),
+      projectName: sampleProject,
+      ticketUrl: `${settings.openproject?.host || 'https://app.teligent.ph/openproject'}/work_packages/${sampleId}`,
+      reassignedAt: new Date().toISOString(),
+    };
+
+    // Play Ding-Dong chime sound
+    playDingDongSound();
+
+    // Trigger desktop notification
+    showAssigneeChangeNotification(reassignmentItem, () => {
+      setActiveView('matrix');
+    });
+
+    // Add to activeAssigneeAlerts
+    setActiveAssigneeAlerts(prev => {
+      const filtered = prev.filter(a => a.opId !== sampleId);
+      return [reassignmentItem, ...filtered];
+    });
+  };
+
+  // Periodic Monitor for OpenProject New Tickets, Reassigned Tickets & Server Down
   useEffect(() => {
     const opConfig = settings.openproject;
     const isConfigured = !!(opConfig?.mock || (opConfig?.host && opConfig?.apiKey));
@@ -387,7 +528,7 @@ export const TaskProvider = ({ children }) => {
     setIsMonitoringActive(true);
     const intervalSeconds = Math.max(15, parseInt(opConfig?.monitorInterval, 10) || 60);
 
-    const checkNewTickets = async () => {
+    const checkMonitorEvents = async () => {
       try {
         const res = await api.pollNewOpenProjectTickets({
           host: opConfig.host,
@@ -399,62 +540,153 @@ export const TaskProvider = ({ children }) => {
 
         setLastMonitoredAt(new Date().toISOString());
 
-        if (res.success && Array.isArray(res.newTickets) && res.newTickets.length > 0) {
-          // Find newly arrived tickets that are unsynced in tasks AND haven't been notified yet
-          const syncedOpIds = new Set(tasks.filter(t => t.openproject_id).map(t => Number(t.openproject_id)));
+        if (res.success) {
+          // Connection is healthy: reset consecutive failure tracking and clear server down alert
+          if (consecutiveFailuresRef.current > 0) {
+            consecutiveFailuresRef.current = 0;
+            setServerDownAlert(null);
+          }
 
-          const unnotifiedTickets = res.newTickets.filter(
-            ticket => !syncedOpIds.has(Number(ticket.opId)) && !notifiedTicketIds.has(Number(ticket.opId))
-          );
+          let soundTriggered = false;
 
-          if (unnotifiedTickets.length > 0) {
-            // Play Ding-Dong sound chime if sound enabled
-            if (opConfig.monitorSound !== false) {
-              playDingDongSound();
-            }
+          // 1. Process Unsynced New Tickets
+          if (Array.isArray(res.newTickets) && res.newTickets.length > 0) {
+            const syncedOpIds = new Set(tasks.filter(t => t.openproject_id).map(t => Number(t.openproject_id)));
+            const unnotifiedTickets = res.newTickets.filter(
+              ticket => !syncedOpIds.has(Number(ticket.opId)) && !notifiedTicketIds.has(Number(ticket.opId))
+            );
 
-            // Trigger Browser Desktop Notification if enabled
-            if (opConfig.monitorBrowserNotification !== false) {
-              unnotifiedTickets.forEach(ticket => {
-                showTicketNotification(ticket, () => {
-                  setActiveView('matrix');
-                  openSyncReview({ projectId: ticket.projectName });
+            if (unnotifiedTickets.length > 0) {
+              if (opConfig.monitorSound !== false && !soundTriggered) {
+                playDingDongSound();
+                soundTriggered = true;
+              }
+
+              if (opConfig.monitorBrowserNotification !== false) {
+                unnotifiedTickets.forEach(ticket => {
+                  showTicketNotification(ticket, () => {
+                    setActiveView('matrix');
+                    openSyncReview({ projectId: ticket.projectName });
+                  });
                 });
+              }
+
+              setActiveNewTicketAlerts(prev => {
+                const existingIds = new Set(prev.map(t => t.opId));
+                const additions = unnotifiedTickets.filter(t => !existingIds.has(t.opId));
+                return [...additions, ...prev];
+              });
+
+              if (opConfig.monitorAutoSync === true) {
+                await commitSyncReview(unnotifiedTickets);
+              }
+
+              setNotifiedTicketIds(prev => {
+                const updated = new Set(prev);
+                unnotifiedTickets.forEach(t => updated.add(t.opId));
+                try {
+                  localStorage.setItem('nextask_notified_tickets', JSON.stringify(Array.from(updated)));
+                } catch (e) {}
+                return updated;
               });
             }
+          }
 
-            // Accumulate in unseen ticket alerts queue (newest first, preserving existing unseen ones)
-            setActiveNewTicketAlerts(prev => {
-              const existingIds = new Set(prev.map(t => t.opId));
-              const additions = unnotifiedTickets.filter(t => !existingIds.has(t.opId));
-              return [...additions, ...prev];
-            });
+          // 2. Process Reassigned Tickets
+          const isAssigneeMonitorEnabled = opConfig.monitorAssigneeChange !== false;
+          if (isAssigneeMonitorEnabled && Array.isArray(res.reassignedTickets) && res.reassignedTickets.length > 0) {
+            const unnotifiedReassignments = res.reassignedTickets.filter(
+              item => !notifiedReassignmentKeys.has(`${item.opId}-${item.newAssignee}`)
+            );
 
-            // If auto-sync is enabled in settings, auto-commit them directly
-            if (opConfig.monitorAutoSync === true) {
-              await commitSyncReview(unnotifiedTickets);
+            if (unnotifiedReassignments.length > 0) {
+              if (opConfig.monitorSound !== false && !soundTriggered) {
+                playDingDongSound();
+                soundTriggered = true;
+              }
+
+              if (opConfig.monitorBrowserNotification !== false) {
+                unnotifiedReassignments.forEach(item => {
+                  showAssigneeChangeNotification(item, () => {
+                    setActiveView('matrix');
+                  });
+                });
+              }
+
+              setActiveAssigneeAlerts(prev => {
+                const existingIds = new Set(prev.map(t => t.opId));
+                const additions = unnotifiedReassignments.filter(t => !existingIds.has(t.opId));
+                return [...additions, ...prev];
+              });
+
+              setNotifiedReassignmentKeys(prev => {
+                const updated = new Set(prev);
+                unnotifiedReassignments.forEach(t => updated.add(`${t.opId}-${t.newAssignee}`));
+                try {
+                  localStorage.setItem('nextask_notified_reassignments', JSON.stringify(Array.from(updated)));
+                } catch (e) {}
+                return updated;
+              });
             }
-
-            // Update notifiedTicketIds so we do not chime again for these tickets
-            setNotifiedTicketIds(prev => {
-              const updated = new Set(prev);
-              unnotifiedTickets.forEach(t => updated.add(t.opId));
-              try {
-                localStorage.setItem('nextask_notified_tickets', JSON.stringify(Array.from(updated)));
-              } catch (e) {}
-              return updated;
-            });
           }
         }
       } catch (pollErr) {
         console.warn('[NexTask Monitor] Background poll error:', pollErr.message);
+        
+        // Track consecutive failures
+        consecutiveFailuresRef.current += 1;
+        const failureCount = consecutiveFailuresRef.current;
+
+        // 1st failure: Notify once that OpenProject is Down
+        if (failureCount === 1) {
+          if (opConfig.monitorSound !== false) {
+            playDingDongSound();
+          }
+          if (opConfig.monitorBrowserNotification !== false) {
+            showServerDownNotification(1, pollErr.message, () => {
+              setIsSettingsOpen(true);
+            });
+          }
+          setServerDownAlert({
+            failureCount: 1,
+            message: pollErr.message || 'Connection to OpenProject failed',
+            isPersistent: false,
+            timestamp: new Date().toISOString(),
+          });
+        }
+        // 3rd failure (after 3 retries): Notify again that OpenProject is unreachable
+        else if (failureCount === 3) {
+          if (opConfig.monitorSound !== false) {
+            playDingDongSound();
+          }
+          if (opConfig.monitorBrowserNotification !== false) {
+            showServerDownNotification(3, pollErr.message, () => {
+              setIsSettingsOpen(true);
+            });
+          }
+          setServerDownAlert({
+            failureCount: 3,
+            message: pollErr.message || 'OpenProject unreachable after 3 retries',
+            isPersistent: true,
+            timestamp: new Date().toISOString(),
+          });
+        }
+        // Subsequent failures: keep counter updated
+        else if (failureCount > 3) {
+          setServerDownAlert(prev => prev ? { ...prev, failureCount } : {
+            failureCount,
+            message: pollErr.message || 'OpenProject unreachable',
+            isPersistent: true,
+            timestamp: new Date().toISOString(),
+          });
+        }
       }
     };
 
     // Run initial check on startup / mount
-    checkNewTickets();
+    checkMonitorEvents();
 
-    const intervalId = setInterval(checkNewTickets, intervalSeconds * 1000);
+    const intervalId = setInterval(checkMonitorEvents, intervalSeconds * 1000);
     return () => clearInterval(intervalId);
   }, [
     settings.openproject?.host,
@@ -467,7 +699,10 @@ export const TaskProvider = ({ children }) => {
     settings.openproject?.monitorSound,
     settings.openproject?.monitorBrowserNotification,
     settings.openproject?.monitorAutoSync,
+    settings.openproject?.monitorAssigneeChange,
     notifiedTicketIds,
+    notifiedReassignmentKeys,
+    tasks,
   ]);
 
   // Filtered Tasks helper (No subtasks)
@@ -476,6 +711,12 @@ export const TaskProvider = ({ children }) => {
       return false;
     }
     if (selectedCategory && task.category_id !== selectedCategory) {
+      return false;
+    }
+    if (selectedSourceFilter === 'user' && task.openproject_id) {
+      return false;
+    }
+    if (selectedSourceFilter === 'openproject' && !task.openproject_id) {
       return false;
     }
     if (searchQuery.trim()) {
@@ -489,6 +730,8 @@ export const TaskProvider = ({ children }) => {
     }
     return true;
   });
+
+  const totalAlertCount = activeNewTicketAlerts.length + activeAssigneeAlerts.length + (serverDownAlert ? 1 : 0);
 
   return (
     <TaskContext.Provider
@@ -507,6 +750,8 @@ export const TaskProvider = ({ children }) => {
         setSelectedCategory,
         selectedQuadrantFilter,
         setSelectedQuadrantFilter,
+        selectedSourceFilter,
+        setSelectedSourceFilter,
         editingTask,
         setEditingTask,
         defaultQuadrantForNew,
@@ -538,14 +783,24 @@ export const TaskProvider = ({ children }) => {
         confirmDialog,
         confirmAction,
         closeConfirmDialog,
-        // Live Monitoring & Sound
+        // Live Monitoring, Alerts & Sound
         activeNewTicketAlerts,
+        activeAssigneeAlerts,
+        serverDownAlert,
+        totalAlertCount,
         activeNewTicketAlert: activeNewTicketAlerts.length > 0 ? { count: activeNewTicketAlerts.length, latestTicket: activeNewTicketAlerts[0], tickets: activeNewTicketAlerts } : null,
         quickSyncNewTicket,
         quickSyncAllNewTickets,
         dismissNewTicketAlert,
+        dismissAssigneeAlert,
+        dismissServerDownAlert,
+        keepReassignedTask,
+        delegateReassignedTask,
+        removeReassignedTask,
         testDingDongChime,
         simulateSampleNewTicket,
+        simulateSampleAssigneeChange,
+        simulateSampleServerDown,
         resetMonitoringHistory,
         isMonitoringActive,
         lastMonitoredAt,

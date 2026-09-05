@@ -51,9 +51,9 @@ function mapSeverityToQuadrant(severityTitle, priorityTitle) {
   return 'Q2'; // Default
 }
 
-// Map OpenProject status title to Clariti status
-// Clariti statuses: 'todo' | 'in_progress' | 'delegated' | 'completed'
-function mapStatusToClariti(statusTitle) {
+// Map OpenProject status title to NexTask status
+// NexTask statuses: 'todo' | 'in_progress' | 'delegated' | 'completed'
+function mapStatusToNexTask(statusTitle) {
   const s = (statusTitle || '').toLowerCase().trim();
   if (s.includes('closed') || s.includes('resolved') || s.includes('completed') || s.includes('rejected') || s.includes('tested') || s.includes('deployed')) {
     return 'completed';
@@ -132,7 +132,7 @@ function extractSeverity(wp) {
 }
 
 // Helper to get matching category ID or auto-create it if it doesn't exist
-function matchOrCreateClaritiCategory(projectLink) {
+function matchOrCreateNexTaskCategory(projectLink) {
   if (!projectLink) return null;
   const projectTitle = (projectLink.title || '').trim();
   if (!projectTitle) return null;
@@ -355,7 +355,7 @@ router.get('/projects', async (req, res) => {
 });
 
 // POST /api/openproject/import-projects
-// Import selected OpenProject projects as Clariti Category Tags
+// Import selected OpenProject projects as NexTask Category Tags
 router.post('/import-projects', (req, res) => {
   try {
     const { projects } = req.body;
@@ -641,7 +641,7 @@ router.post('/fetch-candidates', async (req, res) => {
 
     for (const wp of workPackages) {
       const opStatusTitle = wp._links?.status?.title || 'Unknown';
-      const opMappedStatus = mapStatusToClariti(opStatusTitle);
+      const opMappedStatus = mapStatusToNexTask(opStatusTitle);
 
       // Only include New, Re-Opened, In Progress
       if (!opMappedStatus) continue;
@@ -657,7 +657,7 @@ router.post('/fetch-candidates', async (req, res) => {
       const ticketUrl = `${cleanHost}/work_packages/${opId}`;
 
       // Auto-match or Auto-create project tag in categories table
-      const matchedCategoryId = matchOrCreateClaritiCategory(wp._links?.project);
+      const matchedCategoryId = matchOrCreateNexTaskCategory(wp._links?.project);
       const calculatedQuadrant = defaultQuadrant || mapSeverityToQuadrant(severity, priorityTitle);
 
       const existing = existingMap.get(opId);
@@ -775,7 +775,7 @@ router.get('/poll-new', async (req, res) => {
         const severity = extractSeverity(wp);
         const priorityTitle = wp._links?.priority?.title || '';
         const suggestedQuadrant = config?.defaultQuadrant || mapSeverityToQuadrant(severity, priorityTitle);
-        const suggestedCategoryId = matchOrCreateClaritiCategory(wp._links?.project);
+        const suggestedCategoryId = matchOrCreateNexTaskCategory(wp._links?.project);
 
         unsyncedNewTickets.push({
           opId,
@@ -1001,14 +1001,14 @@ router.post('/sync', async (req, res) => {
       ticketsToSync = workPackages.map(wp => {
         const opId = Number(wp.id);
         const opStatusTitle = wp._links?.status?.title || '';
-        const mappedStatus = mapStatusToClariti(opStatusTitle);
+        const mappedStatus = mapStatusToNexTask(opStatusTitle);
         if (!mappedStatus) return null;
 
         const qaContact = extractQAContact(wp);
         const severity = extractSeverity(wp);
         const priorityTitle = wp._links?.priority?.title || '';
         const calculatedQuadrant = defaultQuadrant || mapSeverityToQuadrant(severity, priorityTitle);
-        const categoryId = matchOrCreateClaritiCategory(wp._links?.project);
+        const categoryId = matchOrCreateNexTaskCategory(wp._links?.project);
         const assignee = wp._links?.assignee?.title || wp.assignee || null;
         const assigneeHref = wp._links?.assignee?.href || '';
         const assigneeIdVal = assigneeHref ? assigneeHref.split('/').pop() : (wp._links?.assignee?.id ? String(wp._links.assignee.id) : null);

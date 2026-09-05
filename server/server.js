@@ -27,6 +27,19 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', app: 'NexTask', time: new Date().toISOString() });
 });
 
-app.listen(PORT, () => {
+// Process error handling
+process.on('uncaughtException', (err) => {
+  console.error('Server Uncaught Exception:', err);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Server Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
+const server = app.listen(PORT, () => {
   console.log(`NexTask server running at http://localhost:${PORT}`);
 });
+
+// Keep process open
+setInterval(() => {}, 1000 * 60 * 60);
+

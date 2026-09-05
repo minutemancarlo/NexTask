@@ -21,6 +21,103 @@ import {
 import { useTasks } from '../../context/TaskContext';
 import { api } from '../../services/api';
 import { StatusFilterSelect } from '../common/StatusFilterSelect';
+import { Pagination } from '../common/Pagination';
+
+export const getStatusBadgeStyle = (status) => {
+  if (!status) {
+    return 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700';
+  }
+  const s = String(status).toLowerCase().trim();
+
+  // Closed / Completed / Verified / Accepted / Released
+  if (
+    s.includes('closed') ||
+    s.includes('complete') ||
+    s.includes('verified') ||
+    s.includes('accepted') ||
+    s.includes('released')
+  ) {
+    return 'bg-teal-100 dark:bg-teal-950/70 text-teal-800 dark:text-teal-300 border-teal-300 dark:border-teal-800/70';
+  }
+
+  // Resolved / Solved / Fixed / Done / Developed / Implemented / Deployed
+  if (
+    s.includes('resolved') ||
+    s.includes('fixed') ||
+    s.includes('done') ||
+    s.includes('solved') ||
+    s.includes('developed') ||
+    s.includes('implemented') ||
+    s.includes('deployed')
+  ) {
+    return 'bg-emerald-100 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800/70';
+  }
+
+  // Re-Opened / Reopened / Reopen
+  if (s.includes('reopen') || s.includes('re-open')) {
+    return 'bg-orange-100 dark:bg-orange-950/70 text-orange-800 dark:text-orange-300 border-orange-300 dark:border-orange-800/70';
+  }
+
+  // Rejected / Invalid / Cancelled / Won't Fix / Declined / Won't Do
+  if (
+    s.includes('reject') ||
+    s.includes('invalid') ||
+    s.includes('cancel') ||
+    s.includes("won't") ||
+    s.includes('wont') ||
+    s.includes('decline')
+  ) {
+    return 'bg-rose-100 dark:bg-rose-950/70 text-rose-800 dark:text-rose-300 border-rose-300 dark:border-rose-800/70';
+  }
+
+  // In Progress / Working / Developing / Ongoing / Active / In Dev
+  if (
+    s.includes('progress') ||
+    s.includes('working') ||
+    s.includes('ongoing') ||
+    s.includes('develop') ||
+    s.includes('active')
+  ) {
+    return 'bg-amber-100 dark:bg-amber-950/70 text-amber-800 dark:text-amber-300 border-amber-300 dark:border-amber-800/70';
+  }
+
+  // Testing / QA / QA Testing / Under Review / Code Review / Review / Validation / In Test
+  if (
+    s.includes('test') ||
+    s.includes('qa') ||
+    s.includes('review') ||
+    s.includes('validation')
+  ) {
+    return 'bg-indigo-100 dark:bg-indigo-950/70 text-indigo-800 dark:text-indigo-300 border-indigo-300 dark:border-indigo-800/70';
+  }
+
+  // On Hold / Blocked / Pending / Waiting / Paused / Postponed / Need Info / Needs Info
+  if (
+    s.includes('hold') ||
+    s.includes('block') ||
+    s.includes('wait') ||
+    s.includes('pend') ||
+    s.includes('pause') ||
+    s.includes('info')
+  ) {
+    return 'bg-yellow-100 dark:bg-yellow-950/70 text-yellow-800 dark:text-yellow-300 border-yellow-300 dark:border-yellow-800/70';
+  }
+
+  // New / Open / Submitted / Unassigned / To Do / Backlog
+  if (
+    s.includes('new') ||
+    s.includes('open') ||
+    s.includes('submit') ||
+    s.includes('todo') ||
+    s.includes('to do') ||
+    s.includes('backlog')
+  ) {
+    return 'bg-sky-100 dark:bg-sky-950/70 text-sky-800 dark:text-sky-300 border-sky-300 dark:border-sky-800/70';
+  }
+
+  // Default fallback
+  return 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300/80 dark:border-slate-700';
+};
 
 export const OpenProjectDashboard = () => {
   const { settings, setIsSettingsOpen } = useTasks();
@@ -73,6 +170,10 @@ export const OpenProjectDashboard = () => {
   // Sorting
   const [sortField, setSortField] = useState('id');
   const [sortAsc, setSortAsc] = useState(false);
+
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
 
   // Alias allowedProjectIds for backward compatibility
   const allowedProjectIds = effectiveAllowedProjectIds;
@@ -207,10 +308,30 @@ export const OpenProjectDashboard = () => {
     return result;
   }, [items, tableSearch, sortField, sortAsc]);
 
+  // Adjust current page if out of bounds
+  const totalPages = pageSize === 'all' ? 1 : Math.max(1, Math.ceil(filteredAndSortedItems.length / (Number(pageSize) || 25)));
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [totalPages, currentPage]);
+
+  // Paginated items slice
+  const paginatedItems = useMemo(() => {
+    if (pageSize === 'all') return filteredAndSortedItems;
+    const size = Number(pageSize) || 25;
+    const start = (currentPage - 1) * size;
+    return filteredAndSortedItems.slice(start, start + size);
+  }, [filteredAndSortedItems, currentPage, pageSize]);
+
   // Bulk selection helpers
   const isAllSelected =
     filteredAndSortedItems.length > 0 &&
     filteredAndSortedItems.every(it => selectedRowIds.has(it.id));
+
+  const isCurrentPageAllSelected =
+    paginatedItems.length > 0 &&
+    paginatedItems.every(it => selectedRowIds.has(it.id));
 
   const isSomeSelected =
     filteredAndSortedItems.some(it => selectedRowIds.has(it.id)) && !isAllSelected;
@@ -548,14 +669,26 @@ export const OpenProjectDashboard = () => {
           </div>
 
           {/* Selection summary & quick toggle */}
-          <div className="flex items-center gap-3 text-xs w-full sm:w-auto justify-between sm:justify-end">
+          <div className="flex items-center gap-3 text-xs w-full sm:w-auto justify-between sm:justify-end flex-wrap">
             <span className="text-slate-500 dark:text-slate-400 font-medium">
               Showing <span className="font-bold text-slate-800 dark:text-white">{filteredAndSortedItems.length}</span> of {items.length}
             </span>
             <div className="flex items-center gap-2">
               <button
-                onClick={() => setSelectedRowIds(new Set(items.map(it => it.id)))}
+                onClick={() => {
+                  const newSet = new Set(selectedRowIds);
+                  paginatedItems.forEach(it => newSet.add(it.id));
+                  setSelectedRowIds(newSet);
+                }}
                 className="px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-300 font-bold border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 cursor-pointer"
+                title="Select all tickets on current page"
+              >
+                Select Page ({paginatedItems.length})
+              </button>
+              <button
+                onClick={() => setSelectedRowIds(new Set(items.map(it => it.id)))}
+                className="px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 font-bold border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 cursor-pointer"
+                title="Select all tickets across all pages"
               >
                 Select All ({items.length})
               </button>
@@ -629,7 +762,7 @@ export const OpenProjectDashboard = () => {
                 {/* Status */}
                 <th
                   onClick={() => handleSort('status')}
-                  className="py-3 px-3 w-28 cursor-pointer hover:bg-slate-200/60 dark:hover:bg-slate-700/60 transition-colors"
+                  className="py-3 px-3 min-w-[130px] whitespace-nowrap cursor-pointer hover:bg-slate-200/60 dark:hover:bg-slate-700/60 transition-colors"
                 >
                   <div className="flex items-center gap-1">
                     <span>Status</span>
@@ -679,7 +812,7 @@ export const OpenProjectDashboard = () => {
                     <p className="text-sm font-semibold">Extracting work packages from OpenProject...</p>
                   </td>
                 </tr>
-              ) : filteredAndSortedItems.length === 0 ? (
+              ) : paginatedItems.length === 0 ? (
                 <tr>
                   <td colSpan={9} className="py-16 text-center text-slate-400 dark:text-slate-500">
                     <TableProperties className="w-8 h-8 mx-auto mb-2 opacity-40" />
@@ -688,7 +821,7 @@ export const OpenProjectDashboard = () => {
                   </td>
                 </tr>
               ) : (
-                filteredAndSortedItems.map((item) => {
+                paginatedItems.map((item) => {
                   const isSelected = selectedRowIds.has(item.id);
                   const isBug = (item.type || '').toLowerCase() === 'bug';
                   const opUrl = `${cleanHost}/work_packages/${item.id}`;
@@ -754,19 +887,23 @@ export const OpenProjectDashboard = () => {
                       </td>
 
                       {/* Status */}
-                      <td className="py-3.5 px-3.5">
-                        <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-200/80 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-300/80 dark:border-slate-700">
+                      <td className="py-3.5 px-3.5 whitespace-nowrap">
+                        <span
+                          className={`px-2.5 py-0.5 rounded-full text-xs font-bold whitespace-nowrap inline-flex items-center shrink-0 border ${getStatusBadgeStyle(
+                            item.status
+                          )}`}
+                        >
                           {item.status}
                         </span>
                       </td>
 
                       {/* Assignee */}
-                      <td className="py-3.5 px-3.5 text-sm text-slate-700 dark:text-slate-300 font-medium">
+                      <td className="py-3.5 px-3.5 whitespace-nowrap text-sm text-slate-700 dark:text-slate-300 font-medium">
                         {item.assignee || <span className="text-slate-400 italic">Unassigned</span>}
                       </td>
 
                       {/* Project */}
-                      <td className="py-3.5 px-3.5 text-sm text-slate-700 dark:text-slate-300 font-medium">
+                      <td className="py-3.5 px-3.5 whitespace-nowrap text-sm text-slate-700 dark:text-slate-300 font-medium">
                         {item.project || '-'}
                       </td>
 
@@ -798,6 +935,16 @@ export const OpenProjectDashboard = () => {
             </tbody>
           </table>
         </div>
+
+        {/* Pagination Controls */}
+        <Pagination
+          currentPage={currentPage}
+          totalItems={filteredAndSortedItems.length}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={setPageSize}
+          itemLabel="work packages"
+        />
 
         {/* Footer Bar */}
         <div className="p-3.5 border-t border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/40 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">

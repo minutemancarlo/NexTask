@@ -15,6 +15,7 @@ import {
   Sparkles,
   HelpCircle,
   Search,
+  UserCheck,
 } from 'lucide-react';
 import { useTasks } from '../../context/TaskContext';
 import { StatusFilterSelect } from '../common/StatusFilterSelect';
@@ -50,6 +51,7 @@ export const SyncReviewModal = () => {
           selectedQuadrant: c.suggestedQuadrant || 'Q2',
           selectedStatus: c.suggestedStatus || c.opMappedStatus || 'todo',
           selectedCategoryId: c.suggestedCategoryId || '',
+          selectedDelegatee: c.delegatee || c.qaContact || '',
         }))
       );
       setCommitError(null);
@@ -113,7 +115,7 @@ export const SyncReviewModal = () => {
         status: c.selectedStatus,
         categoryId: c.selectedCategoryId || null,
         dueDate: c.dueDate,
-        delegatee: c.qaContact,
+        delegatee: c.selectedDelegatee !== undefined ? (c.selectedDelegatee?.trim() || null) : (c.delegatee || c.qaContact || null),
         severity: c.severity,
         ticketUrl: c.ticketUrl,
       }));
@@ -411,20 +413,20 @@ export const SyncReviewModal = () => {
                         </div>
                       )}
 
-                      {/* Review & Edit Controls Row: Category Tag, Quadrant, Status */}
-                      <div className="pt-2 grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+                      {/* Review & Edit Controls Row: Category Tag, Quadrant, Status, Delegatee */}
+                      <div className="pt-2 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
                         {/* Category Tagging Dropdown */}
                         <div>
                           <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1.5">
                             <Tag className="w-3.5 h-3.5 text-indigo-500" />
-                            <span>Project Tag / Category</span>
+                            <span>Project Tag</span>
                           </label>
                           <select
                             value={item.selectedCategoryId || ''}
                             onChange={(e) =>
                               updateCandidate(item.opId, { selectedCategoryId: e.target.value })
                             }
-                            className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs sm:text-sm text-slate-800 dark:text-slate-200 font-medium"
+                            className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-slate-200 font-medium"
                           >
                             <option value="">(None / General)</option>
                             {categories.map((c) => (
@@ -438,33 +440,50 @@ export const SyncReviewModal = () => {
                         {/* Priority Quadrant */}
                         <div>
                           <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                            Eisenhower Quadrant
+                            Quadrant
                           </label>
                           <select
                             value={item.selectedQuadrant}
                             onChange={(e) =>
                               updateCandidate(item.opId, { selectedQuadrant: e.target.value })
                             }
-                            className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs sm:text-sm font-semibold text-slate-800 dark:text-slate-200"
+                            className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold text-slate-800 dark:text-slate-200"
                           >
-                            <option value="Q1">Q1: Do First (Urgent & Important)</option>
-                            <option value="Q2">Q2: Schedule (Important, Not Urgent)</option>
-                            <option value="Q3">Q3: Delegate (Urgent, Not Important)</option>
-                            <option value="Q4">Q4: Eliminate / Low</option>
+                            <option value="Q1">Q1: Do First</option>
+                            <option value="Q2">Q2: Schedule</option>
+                            <option value="Q3">Q3: Delegate</option>
+                            <option value="Q4">Q4: Eliminate</option>
                           </select>
+                        </div>
+
+                        {/* Delegate / QA Contact */}
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1.5">
+                            <UserCheck className="w-3.5 h-3.5 text-blue-500" />
+                            <span>Delegate / QA</span>
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="QA / Delegate..."
+                            value={item.selectedDelegatee !== undefined ? item.selectedDelegatee : (item.delegatee || item.qaContact || '')}
+                            onChange={(e) =>
+                              updateCandidate(item.opId, { selectedDelegatee: e.target.value })
+                            }
+                            className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-800 dark:text-slate-200 font-medium placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                          />
                         </div>
 
                         {/* App Status */}
                         <div>
                           <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                            Target Status in NexTask
+                            Target Status
                           </label>
                           <select
                             value={item.selectedStatus}
                             onChange={(e) =>
                               updateCandidate(item.opId, { selectedStatus: e.target.value })
                             }
-                            className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs sm:text-sm font-semibold text-slate-800 dark:text-slate-200"
+                            className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold text-slate-800 dark:text-slate-200"
                           >
                             <option value="todo">To Do</option>
                             <option value="in_progress">In Progress</option>

@@ -10,6 +10,8 @@ export const FilterBar = () => {
     setSelectedCategory,
     selectedQuadrantFilter,
     setSelectedQuadrantFilter,
+    selectedSourceFilter,
+    setSelectedSourceFilter,
     categories,
     tasks,
   } = useTasks();
@@ -18,9 +20,10 @@ export const FilterBar = () => {
     setSearchQuery('');
     setSelectedCategory('');
     setSelectedQuadrantFilter('');
+    setSelectedSourceFilter('');
   };
 
-  const hasActiveFilters = searchQuery || selectedCategory || selectedQuadrantFilter;
+  const hasActiveFilters = searchQuery || selectedCategory || selectedQuadrantFilter || selectedSourceFilter;
 
   // Urgent counts
   const overdueCount = tasks.filter(t => {
@@ -130,6 +133,17 @@ export const FilterBar = () => {
                 {cat.name}
               </option>
             ))}
+          </select>
+
+          {/* Source Origin Filter (User Added vs OpenProject) */}
+          <select
+            value={selectedSourceFilter}
+            onChange={(e) => setSelectedSourceFilter(e.target.value)}
+            className="px-3 py-2 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 rounded-xl text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 cursor-pointer"
+          >
+            <option value="">All Sources</option>
+            <option value="user">👤 User Added</option>
+            <option value="openproject">🔗 OpenProject</option>
           </select>
 
           {/* Overdue alert indicator */}
