@@ -5,6 +5,7 @@ import { MatrixView } from './components/matrix/MatrixView';
 import { KanbanView } from './components/kanban/KanbanView';
 import { ListView } from './components/list/ListView';
 import { OpenProjectDashboard } from './components/openproject/OpenProjectDashboard';
+import { NotesView } from './components/notes/NotesView';
 import { TaskModal } from './components/task/TaskModal';
 import { SettingsModal } from './components/common/SettingsModal';
 import { SyncReviewModal } from './components/openproject/SyncReviewModal';
@@ -12,6 +13,7 @@ import { NewTicketToast } from './components/common/NewTicketToast';
 import { ConfirmModal } from './components/common/ConfirmModal';
 import { PomodoroTimer } from './components/pomodoro/PomodoroTimer';
 import { useTasks, TaskProvider } from './context/TaskContext';
+import { NotesProvider } from './context/NotesContext';
 import { AlertCircle, RefreshCw } from 'lucide-react';
 
 class ErrorBoundary extends React.Component {
@@ -61,7 +63,7 @@ function AppContent() {
       <Header />
 
       {/* Filter and Search Bar (for Task views: Matrix, Kanban, List) */}
-      {activeView !== 'openproject' && <FilterBar />}
+      {activeView !== 'openproject' && activeView !== 'notes' && <FilterBar />}
 
       {/* Main View Area */}
       <main className="flex-1 flex flex-col">
@@ -94,6 +96,7 @@ function AppContent() {
             {activeView === 'kanban' && <KanbanView />}
             {activeView === 'list' && <ListView />}
             {activeView === 'openproject' && <OpenProjectDashboard />}
+            {activeView === 'notes' && <NotesView />}
           </>
         )}
       </main>
@@ -122,9 +125,11 @@ function AppContent() {
 export default function App() {
   return (
     <TaskProvider>
-      <ErrorBoundary>
-        <AppContent />
-      </ErrorBoundary>
+      <NotesProvider>
+        <ErrorBoundary>
+          <AppContent />
+        </ErrorBoundary>
+      </NotesProvider>
     </TaskProvider>
   );
 }

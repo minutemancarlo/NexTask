@@ -6,6 +6,7 @@ NexTask is an Eisenhower Matrix productivity application built for fast, high-im
 - **Eisenhower Matrix View**: Prioritize tasks into Q1 (Do First), Q2 (Schedule), Q3 (Delegate), and Q4 (Eliminate).
 - **Kanban & List Views**: Switch between Matrix, Kanban boards, and structured lists.
 - **OpenProject Integration**: Direct sync review for work packages with project filtering, status comparisons, and Excel report extractions.
+- **Notes & Memos (Micro-Journaling)**: Lightweight stream inspired by Memos with inline `#hashtag` parsing, tag autocomplete, interactive markdown checklists, searchable code block language dropdown, pin to top, interactive monthly calendar, and markdown/JSON backup export.
 - **Built-in Pomodoro Timer**: Focus timer integrated directly into your task workflow.
 - **Dark & Light Mode**: Clean, responsive, and distraction-free interface.
 

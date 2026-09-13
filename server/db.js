@@ -51,6 +51,30 @@ db.exec(`
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
   );
+
+  CREATE TABLE IF NOT EXISTS notes (
+    id TEXT PRIMARY KEY,
+    content TEXT NOT NULL,
+    pinned INTEGER NOT NULL DEFAULT 0,
+    archived INTEGER NOT NULL DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS note_tags (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    note_id TEXT NOT NULL,
+    tag TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(note_id) REFERENCES notes(id) ON DELETE CASCADE,
+    UNIQUE(note_id, tag)
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_notes_pinned ON notes(pinned);
+  CREATE INDEX IF NOT EXISTS idx_notes_archived ON notes(archived);
+  CREATE INDEX IF NOT EXISTS idx_notes_created_at ON notes(created_at);
+  CREATE INDEX IF NOT EXISTS idx_note_tags_tag ON note_tags(tag);
+  CREATE INDEX IF NOT EXISTS idx_note_tags_note_id ON note_tags(note_id);
 `);
 
 // Migrations: Check and add OpenProject columns if not present
@@ -166,4 +190,71 @@ if (taskCount === 0) {
   );
 }
 
+// Tag extraction helper
+function extractTags(content) {
+  if (!content) return [];
+  const regex = /(?:^|\s)#([a-zA-Z0-9_\u4e00-\u9fa5\u0080-\uffff/-]+)/g;
+  const tags = new Set();
+  let match;
+  while ((match = regex.exec(content)) !== null) {
+    const rawTag = match[1].trim();
+    const cleanTag = rawTag.replace(/[.,!?;:]$/, '');
+    if (cleanTag) tags.add(cleanTag.toLowerCase());
+  }
+  return Array.from(tags);
+}
+
+// Insert default sample notes if empty
+try {
+  const noteCount = db.prepare('SELECT count(*) as count FROM notes').get().count;
+  if (noteCount === 0) {
+    const insertNote = db.prepare(`
+      INSERT INTO notes (id, content, pinned, archived, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `);
+    const insertTag = db.prepare(`
+      INSERT OR IGNORE INTO note_tags (note_id, tag, created_at)
+      VALUES (?, ?, ?)
+    `);
+
+    const now = new Date().toISOString();
+    const yesterday = new Date(Date.now() - 86400000).toISOString();
+
+    const sampleNotes = [
+      {
+        id: 'memo-1',
+        content: `📌 Welcome to **NexTask Notes**! Inspired by modern micro-journaling like #memos.\n\n- [x] Create your first quick thought\n- [ ] Use #hashtags inline anywhere to organize topics\n- [ ] Click any hashtag in the sidebar or note body to filter\n\nTips: Press **Ctrl + Enter** in the composer to save quickly!`,
+        pinned: 1,
+        archived: 0,
+        created_at: now,
+      },
+      {
+        id: 'memo-2',
+        content: `Architecture idea for microservices resilient cache: #architecture #ideas\n\n\`\`\`js\n// Use in-memory LRU with SQLite WAL fallback\nconst cache = new Map();\nfunction get(key) {\n  return cache.get(key) || db.lookup(key);\n}\n\`\`\`\nLooks promising for high-throughput reads.`,
+        pinned: 0,
+        archived: 0,
+        created_at: yesterday,
+      },
+      {
+        id: 'memo-3',
+        content: `Weekly sync notes: #work/meeting #retrospective\n\n- Discussed Q3 priority deliverables.\n- Matrix view is greatly improving focus on Q1 & Q2 items.\n- Follow up with DevOps on Friday.`,
+        pinned: 0,
+        archived: 0,
+        created_at: yesterday,
+      }
+    ];
+
+    for (const note of sampleNotes) {
+      insertNote.run(note.id, note.content, note.pinned, note.archived, note.created_at, note.created_at);
+      const tags = extractTags(note.content);
+      for (const tag of tags) {
+        insertTag.run(note.id, tag, note.created_at);
+      }
+    }
+  }
+} catch (sampleErr) {
+  console.error('Error inserting sample notes:', sampleErr);
+}
+
 module.exports = db;
+module.exports.extractTags = extractTags;

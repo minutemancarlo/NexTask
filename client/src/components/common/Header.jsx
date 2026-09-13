@@ -4,6 +4,7 @@ import {
   Kanban,
   ListOrdered,
   FileSpreadsheet,
+  NotebookPen,
   Settings,
   Plus,
   Moon,
@@ -127,6 +128,18 @@ export const Header = () => {
           >
             <FileSpreadsheet className="w-4 h-4 text-emerald-500" />
             <span>OpenProject</span>
+          </button>
+
+          <button
+            onClick={() => setActiveView('notes')}
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium transition-all cursor-pointer ${
+              activeView === 'notes'
+                ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-xs font-semibold'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            <NotebookPen className="w-4 h-4 text-indigo-500" />
+            <span>Notes</span>
           </button>
         </div>
 

@@ -9,6 +9,7 @@ const tasksRouter = require('./routes/tasks');
 const categoriesRouter = require('./routes/categories');
 const settingsRouter = require('./routes/settings');
 const openprojectRouter = require('./routes/openproject');
+const notesRouter = require('./routes/notes');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -21,6 +22,7 @@ app.use('/api/tasks', tasksRouter);
 app.use('/api/categories', categoriesRouter);
 app.use('/api/settings', settingsRouter);
 app.use('/api/openproject', openprojectRouter);
+app.use('/api/notes', notesRouter);
 
 // Health check
 app.get('/api/health', (req, res) => {

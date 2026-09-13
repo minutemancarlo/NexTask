@@ -286,5 +286,101 @@ export const api = {
     if (!res.ok) throw new Error(data.error || 'Failed to purge data');
     return data;
   },
+
+  // Notes & Memos
+  async getNotes(params = {}) {
+    const query = new URLSearchParams();
+    if (params.filter) query.append('filter', params.filter);
+    if (params.tag) query.append('tag', params.tag);
+    if (params.search) query.append('search', params.search);
+    if (params.date) query.append('date', params.date);
+
+    const res = await fetch(`${API_BASE}/notes?${query.toString()}`);
+    if (!res.ok) throw new Error('Failed to fetch notes');
+    return res.json();
+  },
+
+  async getNoteTags() {
+    const res = await fetch(`${API_BASE}/notes/tags`);
+    if (!res.ok) throw new Error('Failed to fetch note tags');
+    return res.json();
+  },
+
+  async getNoteStats() {
+    const res = await fetch(`${API_BASE}/notes/stats`);
+    if (!res.ok) throw new Error('Failed to fetch note stats');
+    return res.json();
+  },
+
+  async createNote(noteData) {
+    const res = await fetch(`${API_BASE}/notes`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(noteData),
+    });
+    if (!res.ok) throw new Error('Failed to create note');
+    return res.json();
+  },
+
+  async updateNote(id, updates) {
+    const res = await fetch(`${API_BASE}/notes/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates),
+    });
+    if (!res.ok) throw new Error('Failed to update note');
+    return res.json();
+  },
+
+  async togglePinNote(id) {
+    const res = await fetch(`${API_BASE}/notes/${id}/pin`, {
+      method: 'PATCH',
+    });
+    if (!res.ok) throw new Error('Failed to toggle pin');
+    return res.json();
+  },
+
+  async toggleArchiveNote(id) {
+    const res = await fetch(`${API_BASE}/notes/${id}/archive`, {
+      method: 'PATCH',
+    });
+    if (!res.ok) throw new Error('Failed to toggle archive');
+    return res.json();
+  },
+
+  async deleteNote(id) {
+    const res = await fetch(`${API_BASE}/notes/${id}`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) throw new Error('Failed to delete note');
+    return res.json();
+  },
+
+  async exportNotes(format = 'markdown') {
+    const res = await fetch(`${API_BASE}/notes/export?format=${format}`);
+    if (!res.ok) throw new Error('Failed to export notes');
+    if (format === 'json') {
+      const data = await res.json();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `nextask-notes-${new Date().toISOString().split('T')[0]}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      return true;
+    } else {
+      const text = await res.text();
+      const blob = new Blob([text], { type: 'text/markdown;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `nextask-notes-${new Date().toISOString().split('T')[0]}.md`;
+      a.click();
+      URL.revokeObjectURL(url);
+      return true;
+    }
+  },
 };
+
 
