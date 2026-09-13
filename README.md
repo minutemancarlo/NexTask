@@ -5,8 +5,14 @@ NexTask is an Eisenhower Matrix productivity application built for fast, high-im
 ## Features
 - **Eisenhower Matrix View**: Prioritize tasks into Q1 (Do First), Q2 (Schedule), Q3 (Delegate), and Q4 (Eliminate).
 - **Kanban & List Views**: Switch between Matrix, Kanban boards, and structured lists.
+- **Notes & Memos (Micro-Journaling Stream)**:
+  - **Inline `#Hashtags` & Autocomplete**: Tag topics dynamically inline (`#work`, `#ideas`, `#project/v1`); typing `#` triggers a real-time searchable autocomplete dropdown.
+  - **Interactive Monthly Calendar**: Visual calendar navigation highlighting days with active memos; click any day to filter your memo feed instantly.
+  - **Searchable Code Block Language Dropdown**: Insert code blocks with a searchable dropdown covering 35+ languages (Python, TypeScript, SQL, Bash, C#, Go, Rust, Dockerfile, etc.) with clipboard paste support.
+  - **Interactive Checklists & Markdown**: Native Markdown renderer supporting clickable interactive checkboxes (`- [ ]` / `- [x]`), blockquotes, syntax labels, line counts, and 1-click code copying.
+  - **Stream Organization**: Pin important memos to the top, archive notes, search by keyword, and filter by tags with real-time counts.
+  - **Data Backup & Export**: 1-click export of your notes archive into formatted Markdown (`.md`) or raw JSON (`.json`).
 - **OpenProject Integration**: Direct sync review for work packages with project filtering, status comparisons, and Excel report extractions.
-- **Notes & Memos (Micro-Journaling)**: Lightweight stream inspired by Memos with inline `#hashtag` parsing, tag autocomplete, interactive markdown checklists, searchable code block language dropdown, pin to top, interactive monthly calendar, and markdown/JSON backup export.
 - **Built-in Pomodoro Timer**: Focus timer integrated directly into your task workflow.
 - **Dark & Light Mode**: Clean, responsive, and distraction-free interface.
 
