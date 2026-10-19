@@ -381,6 +381,20 @@ export const api = {
       return true;
     }
   },
+
+  async importNotes(payload) {
+    const res = await fetch(`${API_BASE}/notes/import`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data.error || 'Failed to import notes');
+    }
+    return data;
+  },
 };
+
 
 

@@ -998,7 +998,7 @@ export const SettingsModal = () => {
             </h4>
 
             <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
-              Your tasks and configurations are permanently stored in the local SQLite database. You can also export full JSON snapshots anytime.
+              Your tasks, categories, configurations, and notes are permanently stored in the local SQLite database. You can also export full JSON snapshots anytime.
             </p>
 
             <div className="flex items-center gap-3">

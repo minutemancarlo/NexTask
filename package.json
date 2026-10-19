@@ -5,6 +5,7 @@
   "scripts": {
     "server": "node server/server.js",
     "client": "npm --prefix client run dev",
-    "dev": "node start-dev.js"
+    "dev": "node start-dev.js",
+    "test": "node --test"
   }
 }

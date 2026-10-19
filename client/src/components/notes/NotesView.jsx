@@ -6,6 +6,7 @@ import {
   Archive,
   Layers,
   Download,
+  Upload,
   FileCode,
   FileText,
   X,
@@ -20,6 +21,7 @@ import { useNotes } from '../../context/NotesContext';
 import { MemoComposer } from './MemoComposer';
 import { MemoCard } from './MemoCard';
 import { NotesCalendar } from './NotesCalendar';
+import { ImportNotesModal } from './ImportNotesModal';
 
 export const NotesView = () => {
   const {
@@ -43,6 +45,7 @@ export const NotesView = () => {
   // Delete confirmation modal state
   const [noteToDelete, setNoteToDelete] = useState(null);
   const [isExporting, setIsExporting] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
   // Handle Export
   const handleExport = async (format) => {
@@ -208,7 +211,7 @@ export const NotesView = () => {
           <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200/90 dark:border-slate-800 shadow-xs">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-2.5 flex items-center gap-2">
               <Download className="w-4 h-4 text-indigo-500" />
-              <span>Backup & Export</span>
+              <span>Backup & Restore</span>
             </h3>
             <div className="grid grid-cols-2 gap-2">
               <button
@@ -231,6 +234,18 @@ export const NotesView = () => {
               >
                 <FileCode className="w-3.5 h-3.5" />
                 <span>JSON</span>
+              </button>
+            </div>
+
+            <div className="mt-2.5 pt-2.5 border-t border-slate-100 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={() => setIsImportModalOpen(true)}
+                className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/50 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-800/50 text-xs font-semibold transition-colors cursor-pointer shadow-2xs"
+                title="Import backed up notes from a JSON or Markdown file"
+              >
+                <Upload className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                <span>Import Backup</span>
               </button>
             </div>
           </div>
@@ -313,15 +328,26 @@ export const NotesView = () => {
                   ? 'Try clearing active filters or searching for a different keyword or hashtag.'
                   : 'Jot down thoughts, ideas, or meeting notes with full Markdown and #hashtags.'}
               </p>
-              {hasActiveFilters && (
-                <button
-                  type="button"
-                  onClick={clearFilters}
-                  className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
-                >
-                  Clear Filters
-                </button>
-              )}
+              <div className="flex items-center justify-center gap-2 flex-wrap">
+                {hasActiveFilters ? (
+                  <button
+                    type="button"
+                    onClick={clearFilters}
+                    className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+                  >
+                    Clear Filters
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setIsImportModalOpen(true)}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200/70 dark:border-indigo-800/60 text-xs font-semibold shadow-2xs transition-colors cursor-pointer"
+                  >
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>Import Backed Up Notes</span>
+                  </button>
+                )}
+              </div>
             </div>
           ) : (
             /* Stream of Memos */
@@ -374,6 +400,12 @@ export const NotesView = () => {
           </div>
         </div>
       )}
+
+      {/* Import Notes Backup Modal */}
+      <ImportNotesModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+      />
 
     </div>
   );

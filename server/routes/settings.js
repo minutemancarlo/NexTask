@@ -61,6 +61,8 @@ router.get('/export', (req, res) => {
     const subtasks = db.prepare('SELECT * FROM subtasks').all();
     const categories = db.prepare('SELECT * FROM categories').all();
     const settings = db.prepare('SELECT * FROM settings').all();
+    const notes = db.prepare('SELECT * FROM notes').all();
+    const note_tags = db.prepare('SELECT * FROM note_tags').all();
 
     res.json({
       version: '1.0',
@@ -68,7 +70,9 @@ router.get('/export', (req, res) => {
       tasks,
       subtasks,
       categories,
-      settings
+      settings,
+      notes,
+      note_tags,
     });
   } catch (error) {
     console.error('Error exporting data:', error);
@@ -79,7 +83,7 @@ router.get('/export', (req, res) => {
 // POST import data from JSON
 router.post('/import', (req, res) => {
   try {
-    const { tasks, subtasks, categories, settings } = req.body;
+    const { tasks, subtasks, categories, settings, notes } = req.body;
 
     if (!Array.isArray(tasks)) {
       return res.status(400).json({ error: 'Invalid backup file format: tasks array missing' });
@@ -126,6 +130,46 @@ router.post('/import', (req, res) => {
           insertSub.run(s.id, s.task_id, s.title, s.is_completed ? 1 : 0, s.sort_order || 0);
         });
       }
+
+      // Restore notes if provided in backup
+      if (notes && Array.isArray(notes)) {
+        db.prepare('DELETE FROM note_tags').run();
+        db.prepare('DELETE FROM notes').run();
+
+        const insertNote = db.prepare(`
+          INSERT INTO notes (id, content, pinned, archived, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?)
+        `);
+        const insertTag = db.prepare(`
+          INSERT OR IGNORE INTO note_tags (note_id, tag, created_at)
+          VALUES (?, ?, ?)
+        `);
+
+        notes.forEach((n, idx) => {
+          if (!n || typeof n.content !== 'string' || !n.content.trim()) return;
+          const noteId = (n.id && String(n.id).trim()) || `memo-${Date.now()}-${Math.random().toString(36).substring(2, 7)}-${idx}`;
+          const createdAt = n.created_at || new Date().toISOString();
+          const updatedAt = n.updated_at || createdAt;
+
+          insertNote.run(
+            noteId,
+            n.content.trim(),
+            n.pinned ? 1 : 0,
+            n.archived ? 1 : 0,
+            createdAt,
+            updatedAt
+          );
+
+          const tags = Array.isArray(n.tags) && n.tags.length > 0
+            ? n.tags
+            : (db.extractTags ? db.extractTags(n.content) : []);
+          tags.forEach(t => {
+            const cleanTag = typeof t === 'string' ? t.replace(/^#/, '').toLowerCase().trim() : '';
+            if (cleanTag) insertTag.run(noteId, cleanTag, createdAt);
+          });
+        });
+      }
+
       db.exec('COMMIT');
     } catch (e) {
       db.exec('ROLLBACK');

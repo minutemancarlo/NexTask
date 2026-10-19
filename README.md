@@ -11,7 +11,7 @@ NexTask is an Eisenhower Matrix productivity application built for fast, high-im
   - **Searchable Code Block Language Dropdown**: Insert code blocks with a searchable dropdown covering 35+ languages (Python, TypeScript, SQL, Bash, C#, Go, Rust, Dockerfile, etc.) with clipboard paste support.
   - **Interactive Checklists & Markdown**: Native Markdown renderer supporting clickable interactive checkboxes (`- [ ]` / `- [x]`), blockquotes, syntax labels, line counts, and 1-click code copying.
   - **Stream Organization**: Pin important memos to the top, archive notes, search by keyword, and filter by tags with real-time counts.
-  - **Data Backup & Export**: 1-click export of your notes archive into formatted Markdown (`.md`) or raw JSON (`.json`).
+  - **Backup, Export & Import**: 1-click export of notes to formatted Markdown (`.md`) or raw JSON (`.json`), plus importing backed up notes with smart hashtag re-indexing and merge or replace options.
 - **OpenProject Integration**: Direct sync review for work packages with project filtering, status comparisons, and Excel report extractions.
 - **Built-in Pomodoro Timer**: Focus timer integrated directly into your task workflow.
 - **Dark & Light Mode**: Clean, responsive, and distraction-free interface.

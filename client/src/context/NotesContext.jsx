@@ -180,6 +180,22 @@ export const NotesProvider = ({ children }) => {
     return api.exportNotes(format);
   };
 
+  // Import backed up notes
+  const importNotes = async (payload, mode = 'merge') => {
+    try {
+      const body = typeof payload === 'object' && !Array.isArray(payload) && (payload.notes || payload.markdown)
+        ? { mode, ...payload }
+        : { notes: payload, mode };
+      const result = await api.importNotes(body);
+      await fetchNotes();
+      await refreshMetadata();
+      return result;
+    } catch (err) {
+      console.error('Failed to import notes:', err);
+      throw err;
+    }
+  };
+
   return (
     <NotesContext.Provider
       value={{
@@ -205,6 +221,7 @@ export const NotesProvider = ({ children }) => {
         toggleArchive,
         deleteNote,
         exportNotes,
+        importNotes,
       }}
     >
       {children}

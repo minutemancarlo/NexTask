@@ -120,6 +120,93 @@ router.get('/stats', (req, res) => {
   }
 });
 
+// Helper to parse notes from exported Markdown
+function parseMarkdownNotes(markdownText) {
+  if (!markdownText || typeof markdownText !== 'string') return [];
+
+  // Split on --- separator (handling CRLF or LF)
+  const sections = markdownText.split(/(?:\r?\n|^)---(?:\r?\n|$)/);
+  const notes = [];
+
+  for (const section of sections) {
+    const trimmed = section.trim();
+    if (!trimmed) continue;
+    // Skip export title header block if present
+    if (trimmed.startsWith('# NexTask Notes Export')) continue;
+
+    // Check if section contains a note header: ### Note [timestamp] (Pinned) (Archived)
+    const headerMatch = trimmed.match(/^### Note(?:\s+\[([^\]]+)\])?([^\n]*)/i);
+    let content = trimmed;
+    let createdAt = new Date().toISOString();
+    let pinned = false;
+    let archived = false;
+
+    if (headerMatch) {
+      if (headerMatch[1]) {
+        const parsedDate = new Date(headerMatch[1].trim());
+        if (!isNaN(parsedDate.getTime())) {
+          createdAt = parsedDate.toISOString();
+        }
+      }
+      const flags = (headerMatch[2] || '').toLowerCase();
+      if (flags.includes('pinned')) pinned = true;
+      if (flags.includes('archived')) archived = true;
+
+      // Remove the header line
+      content = trimmed.slice(headerMatch[0].length).trim();
+    }
+
+    // Look for and strip out "Tags: #tag1 #tag2..." line if present right below header
+    const tagsMatch = content.match(/^Tags:\s*([^\n]+)/i);
+    if (tagsMatch) {
+      content = content.slice(tagsMatch[0].length).trim();
+    }
+
+    if (content.length > 0) {
+      notes.push({
+        id: `memo-${Date.now()}-${Math.random().toString(36).substring(2, 7)}-${notes.length}`,
+        content,
+        pinned,
+        archived,
+        created_at: createdAt,
+        updated_at: createdAt,
+      });
+    }
+  }
+
+  // If no sections were separated by ---, but text exists, treat the entire markdown as a single note
+  if (notes.length === 0 && markdownText.trim().length > 0 && !markdownText.trim().startsWith('# NexTask Notes Export')) {
+    notes.push({
+      id: `memo-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      content: markdownText.trim(),
+      pinned: false,
+      archived: false,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
+  }
+
+  return notes;
+}
+
+// Helper to extract an array of note candidate objects from diverse payload shapes
+function extractNotesFromPayload(body) {
+  if (!body) return [];
+  if (Array.isArray(body)) return body;
+  if (Array.isArray(body.notes)) return body.notes;
+  if (typeof body.markdown === 'string') {
+    return parseMarkdownNotes(body.markdown);
+  }
+  if (body.format === 'markdown' && typeof body.content === 'string') {
+    return parseMarkdownNotes(body.content);
+  }
+  // Single note object with content
+  if (body.content && typeof body.content === 'string') {
+    return [body];
+  }
+  return [];
+}
+
 // GET /api/notes/export - Export all notes as JSON or Markdown bundle
 router.get('/export', (req, res) => {
   try {
@@ -148,6 +235,120 @@ router.get('/export', (req, res) => {
   } catch (err) {
     console.error('Error exporting notes:', err);
     res.status(500).json({ error: 'Failed to export notes' });
+  }
+});
+
+// POST /api/notes/import - Import backed up notes from JSON or Markdown
+router.post('/import', (req, res) => {
+  try {
+    const mode = req.body && req.body.mode === 'replace' ? 'replace' : 'merge';
+    const rawNotes = extractNotesFromPayload(req.body);
+
+    if (!Array.isArray(rawNotes) || rawNotes.length === 0) {
+      return res.status(400).json({ error: 'No valid notes found to import' });
+    }
+
+    const validNotes = [];
+    for (let i = 0; i < rawNotes.length; i++) {
+      const n = rawNotes[i];
+      if (!n || typeof n.content !== 'string' || !n.content.trim()) {
+        continue;
+      }
+
+      const noteId = (n.id && String(n.id).trim()) || `memo-${Date.now()}-${Math.random().toString(36).substring(2, 7)}-${i}`;
+      const pinned = n.pinned ? 1 : 0;
+      const archived = n.archived ? 1 : 0;
+      const now = new Date().toISOString();
+      let createdAt = now;
+      if (n.created_at) {
+        const d = new Date(n.created_at);
+        if (!isNaN(d.getTime())) createdAt = d.toISOString();
+      }
+      let updatedAt = createdAt;
+      if (n.updated_at) {
+        const d = new Date(n.updated_at);
+        if (!isNaN(d.getTime())) updatedAt = d.toISOString();
+      }
+
+      // Collect tags from content and from explicit tags array
+      const tagsSet = new Set(extractTags(n.content));
+      if (Array.isArray(n.tags)) {
+        for (const t of n.tags) {
+          if (typeof t === 'string' && t.trim()) {
+            tagsSet.add(t.replace(/^#/, '').toLowerCase().trim());
+          }
+        }
+      }
+
+      validNotes.push({
+        id: noteId,
+        content: n.content.trim(),
+        pinned,
+        archived,
+        created_at: createdAt,
+        updated_at: updatedAt,
+        tags: Array.from(tagsSet),
+      });
+    }
+
+    if (validNotes.length === 0) {
+      return res.status(400).json({ error: 'No valid notes with content found to import' });
+    }
+
+    db.exec('BEGIN');
+    try {
+      if (mode === 'replace') {
+        db.prepare('DELETE FROM note_tags').run();
+        db.prepare('DELETE FROM notes').run();
+      }
+
+      const upsertNote = db.prepare(`
+        INSERT INTO notes (id, content, pinned, archived, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+          content = excluded.content,
+          pinned = excluded.pinned,
+          archived = excluded.archived,
+          updated_at = excluded.updated_at
+      `);
+
+      const deleteNoteTags = db.prepare('DELETE FROM note_tags WHERE note_id = ?');
+      const insertTag = db.prepare(`
+        INSERT OR IGNORE INTO note_tags (note_id, tag, created_at)
+        VALUES (?, ?, ?)
+      `);
+
+      for (const note of validNotes) {
+        upsertNote.run(
+          note.id,
+          note.content,
+          note.pinned,
+          note.archived,
+          note.created_at,
+          note.updated_at
+        );
+
+        deleteNoteTags.run(note.id);
+        for (const tag of note.tags) {
+          insertTag.run(note.id, tag, note.created_at);
+        }
+      }
+
+      db.exec('COMMIT');
+    } catch (e) {
+      db.exec('ROLLBACK');
+      throw e;
+    }
+
+    res.json({
+      success: true,
+      mode,
+      importedCount: validNotes.length,
+      message: `Successfully imported ${validNotes.length} note${validNotes.length === 1 ? '' : 's'} (${mode} mode).`,
+    });
+  } catch (err) {
+    console.error('Error importing notes:', err);
+    res.status(500).json({ error: 'Failed to import notes: ' + err.message });
   }
 });
 
@@ -299,4 +500,8 @@ router.delete('/:id', (req, res) => {
   }
 });
 
+router.parseMarkdownNotes = parseMarkdownNotes;
+router.extractNotesFromPayload = extractNotesFromPayload;
+
 module.exports = router;
+
